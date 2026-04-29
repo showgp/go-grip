@@ -3,7 +3,7 @@ package cmd
 import (
 	"os"
 
-	"github.com/chrishrb/go-grip/internal"
+	"github.com/showgp/go-grip/internal"
 	"github.com/spf13/cobra"
 )
 

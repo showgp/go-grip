@@ -15,8 +15,10 @@
 ## Table of Contents
 
 - [About](#question-about)
+- [Fork status](#twisted_rightwards_arrows-fork-status)
 - [Features](#zap-features)
 - [Getting started](#rocket-getting-started)
+- [Releasing](#package-releasing)
 - [Usage](#hammer-usage)
 - [Examples](#pencil-examples)
 - [Known TODOs / Bugs](#bug-known-todos--bugs)
@@ -28,10 +30,22 @@
 
 This project is a reimplementation of the original Python-based [grip](https://github.com/joeyespo/grip), which uses GitHub's web API for rendering. By eliminating the reliance on external APIs, go-grip delivers similar functionality while being fully self-contained, faster, and more secure - perfect for offline use or privacy-conscious users.
 
+## :twisted_rightwards_arrows: Fork status
+
+This repository is a fork of [chrishrb/go-grip](https://github.com/chrishrb/go-grip).
+
+The main purpose of this fork is to add extra Markdown preview support for cases where a single-file preview is not enough. These changes are intended to make local documentation folders easier to browse and use, especially when working with multiple Markdown files or long documents.
+
+At the moment, this fork is maintained as a separate modified version and does not plan to open a pull request against the upstream repository.
+
 ## :zap: Features
 
 - :zap: Written in Go :+1:
 - 📄 Render markdown to HTML and view it in your browser
+- Browse all Markdown files in a directory from a local documentation sidebar
+- Multi-file Markdown preview with article navigation
+- Per-page table of contents for rendered documents
+- Active table-of-contents highlighting while scrolling
 - 📱 Dark and light theme
 - 🎨 Syntax highlighting for code
 - [x] Todo list like the one on GitHub
@@ -41,6 +55,9 @@ This project is a reimplementation of the original Python-based [grip](https://g
 - math expressions (code, inline, block)
 - gh issues and prs #46 and grafana/grafana#22
 - toggle state is preserved in [sessionStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage)
+- automatic fallback to the next available port when the default port is busy
+- strict explicit port handling with `-p`
+- optional automatic browser reload control with `--no-reload`
 
 This is an inline $\sqrt{3x-1}+(1+x)^2$ function.
 
@@ -61,7 +78,7 @@ graph TD;
 ```go
 package main
 
-import "github.com/chrishrb/go-grip/cmd"
+import "github.com/showgp/go-grip/cmd"
 
 func main() {
 	fmt.Sprintln("Welcome to Grip! Use `go-grip --help` for more information.")
@@ -77,15 +94,52 @@ func main() {
 
 ## :rocket: Getting started
 
-To install go-grip, simply:
+### Download a prebuilt binary
+
+The easiest way to install go-grip is to download the archive for your operating system from the [latest release](https://github.com/showgp/go-grip/releases/latest).
+
+Available release builds:
+
+- macOS: `go-grip_<version>_darwin_amd64.tar.gz` or `go-grip_<version>_darwin_arm64.tar.gz`
+- Linux: `go-grip_<version>_linux_amd64.tar.gz` or `go-grip_<version>_linux_arm64.tar.gz`
+- Windows: `go-grip_<version>_windows_amd64.zip` or `go-grip_<version>_windows_arm64.zip`
+
+For macOS and Linux:
 
 ```bash
-go install github.com/chrishrb/go-grip@latest
+tar -xzf go-grip_<version>_<os>_<arch>.tar.gz
+chmod +x go-grip
+./go-grip --help
+```
+
+For Windows, unzip the downloaded archive and run:
+
+```powershell
+.\go-grip.exe --help
+```
+
+### Install with Go
+
+If you have Go installed, you can also build and install directly from this fork:
+
+```bash
+go install github.com/showgp/go-grip@latest
 ```
 
 > [!TIP]
 > You can also use nix flakes to install this plugin.
 > More useful information [here](https://nixos.wiki/wiki/Flakes).
+
+## :package: Releasing
+
+This fork publishes release archives automatically when a version tag is pushed.
+
+```bash
+git tag v0.1.0
+git push github v0.1.0
+```
+
+The release workflow runs tests, builds macOS/Linux/Windows binaries, uploads archives to GitHub Releases, and includes `checksums.txt` for verification.
 
 ## :hammer: Usage
 

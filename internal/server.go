@@ -14,7 +14,7 @@ import (
 	"github.com/aarol/reload"
 	chroma_html "github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/alecthomas/chroma/v2/styles"
-	"github.com/chrishrb/go-grip/defaults"
+	"github.com/showgp/go-grip/defaults"
 )
 
 type Server struct {
