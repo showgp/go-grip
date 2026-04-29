@@ -14,14 +14,22 @@ func TestListenOnPortFallsBackWhenNotStrict(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reserve port: %v", err)
 	}
-	defer occupied.Close()
+	defer func() {
+		if err := occupied.Close(); err != nil {
+			t.Errorf("close occupied listener: %v", err)
+		}
+	}()
 
 	port := occupied.Addr().(*net.TCPAddr).Port
 	listener, actualPort, err := listenOnPort(port, false)
 	if err != nil {
 		t.Fatalf("listen with fallback: %v", err)
 	}
-	defer listener.Close()
+	defer func() {
+		if err := listener.Close(); err != nil {
+			t.Errorf("close fallback listener: %v", err)
+		}
+	}()
 
 	if actualPort == port {
 		t.Fatalf("expected fallback port, got original occupied port %d", actualPort)
@@ -35,12 +43,18 @@ func TestListenOnPortReportsStrictConflict(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reserve port: %v", err)
 	}
-	defer occupied.Close()
+	defer func() {
+		if err := occupied.Close(); err != nil {
+			t.Errorf("close occupied listener: %v", err)
+		}
+	}()
 
 	port := occupied.Addr().(*net.TCPAddr).Port
 	listener, _, err := listenOnPort(port, true)
 	if err == nil {
-		listener.Close()
+		if err := listener.Close(); err != nil {
+			t.Errorf("close unexpected listener: %v", err)
+		}
 		t.Fatalf("expected strict conflict on port %d", port)
 	}
 	if got := err.Error(); got == "" || !strings.Contains(got, fmt.Sprintf("%d", port)) {

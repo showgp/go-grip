@@ -102,7 +102,7 @@ func collectTOC(node gast.Node, source []byte) []TOCEntry {
 		}
 
 		id := attributeString(heading, "id")
-		text := strings.TrimSpace(string(heading.Text(source)))
+		text := strings.TrimSpace(headingText(heading, source))
 		if id == "" || text == "" {
 			return gast.WalkContinue, nil
 		}
@@ -115,6 +115,32 @@ func collectTOC(node gast.Node, source []byte) []TOCEntry {
 		return gast.WalkSkipChildren, nil
 	})
 	return entries
+}
+
+func headingText(heading *gast.Heading, source []byte) string {
+	var builder strings.Builder
+	for child := heading.FirstChild(); child != nil; child = child.NextSibling() {
+		appendNodeText(&builder, child, source)
+	}
+	return builder.String()
+}
+
+func appendNodeText(builder *strings.Builder, node gast.Node, source []byte) {
+	switch typed := node.(type) {
+	case *gast.Text:
+		builder.Write(typed.Value(source))
+		if typed.SoftLineBreak() || typed.HardLineBreak() {
+			builder.WriteByte(' ')
+		}
+	case *gast.String:
+		builder.Write(typed.Value)
+	case *gast.AutoLink:
+		builder.Write(typed.Label(source))
+	default:
+		for child := node.FirstChild(); child != nil; child = child.NextSibling() {
+			appendNodeText(builder, child, source)
+		}
+	}
 }
 
 func attributeString(node gast.Node, name string) string {
