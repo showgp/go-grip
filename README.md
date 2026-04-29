@@ -16,6 +16,7 @@
 
 - [About](#question-about)
 - [Fork status](#twisted_rightwards_arrows-fork-status)
+- [Differences from upstream](#sparkles-differences-from-upstream)
 - [Features](#zap-features)
 - [Getting started](#rocket-getting-started)
 - [Releasing](#package-releasing)
@@ -37,6 +38,35 @@ This repository is a fork of [chrishrb/go-grip](https://github.com/chrishrb/go-g
 The main purpose of this fork is to add extra Markdown preview support for cases where a single-file preview is not enough. These changes are intended to make local documentation folders easier to browse and use, especially when working with multiple Markdown files or long documents.
 
 At the moment, this fork is maintained as a separate modified version and does not plan to open a pull request against the upstream repository.
+
+## :sparkles: Differences from upstream
+
+Compared with the upstream repository, this fork focuses on local documentation browsing and smoother long-document navigation.
+
+Additional documentation browsing support:
+
+- Directory mode: running `go-grip` or `go-grip .` opens a documentation view for all Markdown files in the current directory.
+- Multi-file navigation: directory mode adds an article sidebar so related Markdown files can be opened without restarting the server.
+- Custom directory targets: running `go-grip docs` opens Markdown files from another directory.
+
+Additional table-of-contents support:
+
+- Each rendered article gets its own table of contents.
+- The active TOC item updates while scrolling through the article.
+- Long TOCs automatically scroll to keep the active item visible.
+- When the page reaches the bottom, the final TOC entry can become active even if the last heading cannot scroll to the top marker.
+
+Additional server behavior:
+
+- If the default port is busy, go-grip automatically tries the next available port.
+- If a port is explicitly set with `-p`, go-grip treats that port as strict and reports an error when it is unavailable.
+- `--no-reload` disables automatic browser reload on file changes.
+
+Distribution changes:
+
+- This fork uses the module path `github.com/showgp/go-grip`.
+- GitHub Releases publish prebuilt macOS, Linux, and Windows binaries.
+- Release archives include checksums for download verification.
 
 ## :zap: Features
 
