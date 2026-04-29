@@ -3,14 +3,13 @@ package internal
 import (
 	"bytes"
 	"fmt"
+	"html/template"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"path"
-	"regexp"
 	"strings"
-	"text/template"
 
 	"github.com/aarol/reload"
 	chroma_html "github.com/alecthomas/chroma/v2/formatters/html"
@@ -25,26 +24,54 @@ type Server struct {
 	port         int
 	browser      bool
 	enableReload bool
+	strictPort   bool
+}
+
+type ServerOptions struct {
+	Host         string
+	Port         int
+	BoundingBox  bool
+	Browser      bool
+	EnableReload bool
+	StrictPort   bool
+	Parser       *Parser
 }
 
 func NewServer(host string, port int, boundingBox bool, browser bool, enableReload bool, parser *Parser) *Server {
+	return NewServerWithOptions(ServerOptions{
+		Host:         host,
+		Port:         port,
+		BoundingBox:  boundingBox,
+		Browser:      browser,
+		EnableReload: enableReload,
+		Parser:       parser,
+	})
+}
+
+func NewServerWithOptions(opts ServerOptions) *Server {
+	if opts.Parser == nil {
+		opts.Parser = NewParser()
+	}
 	return &Server{
-		host:         host,
-		port:         port,
-		boundingBox:  boundingBox,
-		browser:      browser,
-		enableReload: enableReload,
-		parser:       parser,
+		host:         opts.Host,
+		port:         opts.Port,
+		boundingBox:  opts.BoundingBox,
+		browser:      opts.Browser,
+		enableReload: opts.EnableReload,
+		strictPort:   opts.StrictPort,
+		parser:       opts.Parser,
 	}
 }
 
 func (s *Server) Serve(file string) error {
-	directory := path.Dir(file)
-	filename := path.Base(file)
+	target, err := resolveServeTarget(file)
+	if err != nil {
+		return err
+	}
 
 	var reloadMiddleware *reload.Reloader
 	if s.enableReload {
-		reloadMiddleware = reload.New(directory)
+		reloadMiddleware = reload.New(target.rootDir)
 		reloadMiddleware.DebugLog = log.New(io.Discard, "", 0)
 		// Fix WebSocket CORS issues for development
 		reloadMiddleware.Upgrader.CheckOrigin = func(r *http.Request) bool {
@@ -52,25 +79,26 @@ func (s *Server) Serve(file string) error {
 		}
 	}
 
-	dir := http.Dir(directory)
-	handler := s.newHandler(dir)
+	handler := s.newHandlerForTarget(target)
 
-	addr := fmt.Sprintf("http://%s:%d/", s.host, s.port)
-	if file == "" {
-		// If README.md exists then open README.md at beginning
-		readme := "README.md"
-		f, err := dir.Open(readme)
-		if err == nil {
-			//nolint:errcheck
-			defer f.Close()
-		}
-		if err == nil {
-			addr, _ = url.JoinPath(addr, readme)
-		}
+	if s.enableReload {
+		handler = reloadMiddleware.Handle(handler)
+		fmt.Printf("📡 Auto-reload enabled. Files will trigger browser refresh.\n")
 	} else {
-		addr, _ = url.JoinPath(addr, filename)
+		fmt.Printf("🔄 Auto-reload disabled. Use F5 to manually refresh.\n")
 	}
 
+	listener, actualPort, err := listenOnPort(s.port, s.strictPort)
+	if err != nil {
+		return err
+	}
+
+	initialPath, err := initialPathForTarget(target)
+	if err != nil {
+		_ = listener.Close()
+		return err
+	}
+	addr := fmt.Sprintf("http://%s:%d%s", s.host, actualPort, initialPath)
 	fmt.Printf("🚀 Starting server: %s\n", addr)
 
 	if s.browser {
@@ -80,53 +108,54 @@ func (s *Server) Serve(file string) error {
 		}
 	}
 
-	if s.enableReload {
-		handler = reloadMiddleware.Handle(handler)
-		fmt.Printf("📡 Auto-reload enabled. Files will trigger browser refresh.\n")
-	} else {
-		fmt.Printf("🔄 Auto-reload disabled. Use F5 to manually refresh.\n")
-	}
-	return http.ListenAndServe(fmt.Sprintf(":%d", s.port), handler)
+	return http.Serve(listener, handler)
 }
 
 func (s *Server) newHandler(dir http.Dir) http.Handler {
+	target := serveTarget{
+		mode:    modeDirectory,
+		rootDir: string(dir),
+	}
+	return s.newHandlerForTarget(target)
+}
+
+func (s *Server) newHandlerForTarget(target serveTarget) http.Handler {
+	dir := http.Dir(target.rootDir)
 	fileServer := http.FileServer(dir)
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.FileServer(http.FS(defaults.StaticFiles)))
 
-	regex := regexp.MustCompile(`(?i)\.md$`)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if regex.MatchString(r.URL.Path) {
-			isFile, err := isRegularFile(dir, r.URL.Path)
+		requestFile := cleanRequestPath(r.URL.Path)
+		if requestFile == "" {
+			setNoCacheHeaders(w)
+			initialPath, err := initialPathForTarget(target)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			if initialPath != "/" {
+				http.Redirect(w, r, initialPath, http.StatusFound)
+				return
+			}
+			s.renderEmpty(w, target)
+			return
+		}
+
+		if isMarkdownFile(requestFile) {
+			if target.mode == modeSingleFile && requestFile != target.initialFile {
+				http.NotFound(w, r)
+				return
+			}
+
+			isFile, err := isRegularFile(dir, requestFile)
 			if err == nil && isFile {
-				setNoCacheHeaders(w)
-
-				bytes, err := readToString(dir, r.URL.Path)
-				if err != nil {
-					log.Fatal(err)
-					return
-				}
-				htmlContent, err := s.parser.MdToHTML(bytes)
-				if err != nil {
-					log.Fatal(err)
-					return
-				}
-
-				err = serveTemplate(w, htmlStruct{
-					Content:      string(htmlContent),
-					BoundingBox:  s.boundingBox,
-					CssCodeLight: getCssCode("github"),
-					CssCodeDark:  getCssCode("github-dark"),
-				})
-				if err != nil {
-					log.Fatal(err)
-					return
-				}
+				s.renderMarkdown(w, dir, target, requestFile)
 				return
 			}
 		}
 
-		isDirectory, err := isDirectory(dir, r.URL.Path)
+		isDirectory, err := isDirectory(dir, requestFile)
 		if err == nil && isDirectory {
 			setNoCacheHeaders(w)
 			stripCacheValidators(r)
@@ -136,6 +165,65 @@ func (s *Server) newHandler(dir http.Dir) http.Handler {
 	})
 
 	return mux
+}
+
+func (s *Server) renderMarkdown(w http.ResponseWriter, dir http.Dir, target serveTarget, currentFile string) {
+	setNoCacheHeaders(w)
+
+	bytes, err := readToString(dir, currentFile)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	rendered, err := s.parser.Render(bytes)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	page, err := s.newPageData(target, currentFile, template.HTML(rendered.Content), rendered.TOC)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := serveTemplate(w, page); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) renderEmpty(w http.ResponseWriter, target serveTarget) {
+	setNoCacheHeaders(w)
+
+	content := template.HTML(`<div class="docs-empty"><h1>No Markdown files found</h1><p>Add a Markdown file to this directory and refresh the page.</p></div>`)
+	page, err := s.newPageData(target, "", content, nil)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := serveTemplate(w, page); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) newPageData(target serveTarget, currentFile string, content template.HTML, toc []TOCEntry) (htmlStruct, error) {
+	var articles []Article
+	if target.mode == modeDirectory {
+		discovered, err := discoverArticles(target.rootDir)
+		if err != nil {
+			return htmlStruct{}, err
+		}
+		articles = articlesWithActive(discovered, currentFile)
+	}
+
+	return htmlStruct{
+		Content:      content,
+		BoundingBox:  s.boundingBox,
+		CssCodeLight: template.CSS(getCssCode("github")),
+		CssCodeDark:  template.CSS(getCssCode("github-dark")),
+		ShowSidebar:  target.mode == modeDirectory,
+		Articles:     articles,
+		TOC:          toc,
+	}, nil
 }
 
 func readToString(dir http.Dir, filename string) ([]byte, error) {
@@ -155,10 +243,13 @@ func readToString(dir http.Dir, filename string) ([]byte, error) {
 }
 
 type htmlStruct struct {
-	Content      string
+	Content      template.HTML
 	BoundingBox  bool
-	CssCodeLight string
-	CssCodeDark  string
+	CssCodeLight template.CSS
+	CssCodeDark  template.CSS
+	ShowSidebar  bool
+	Articles     []Article
+	TOC          []TOCEntry
 }
 
 func serveTemplate(w http.ResponseWriter, html htmlStruct) error {
@@ -169,6 +260,35 @@ func serveTemplate(w http.ResponseWriter, html htmlStruct) error {
 	}
 	err = tmpl.Execute(w, html)
 	return err
+}
+
+func initialPathForTarget(target serveTarget) (string, error) {
+	if target.mode == modeSingleFile {
+		return "/" + urlPathEscape(target.initialFile), nil
+	}
+
+	articles, err := discoverArticles(target.rootDir)
+	if err != nil {
+		return "", err
+	}
+	initial := initialArticle(articles)
+	if initial == "" {
+		return "/", nil
+	}
+	return "/" + urlPathEscape(initial), nil
+}
+
+func cleanRequestPath(requestPath string) string {
+	cleaned := strings.TrimPrefix(path.Clean("/"+requestPath), "/")
+	unescaped, err := url.PathUnescape(cleaned)
+	if err != nil {
+		return cleaned
+	}
+	return unescaped
+}
+
+func urlPathEscape(file string) string {
+	return url.PathEscape(file)
 }
 
 func getCssCode(style string) string {

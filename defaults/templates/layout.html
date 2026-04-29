@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="/static/css/github-clipboard.css" />
     <link rel="stylesheet" href="/static/css/mathjax.css" />
     <link rel="stylesheet" href="/static/css/theme-switch.css" />
+    <link rel="stylesheet" href="/static/css/docs-layout.css" />
     <script src="/static/js/theme-switch.js"></script>
     <script src="/static/js/clipboard-copy.js"></script>
     <script src="/static/js/mathjax-options.js"></script>
@@ -36,13 +37,56 @@
     <button id="theme-toggle" class="theme-toggle" title="Toggle theme">
       <span class="theme-toggle-icon"></span>
     </button>
-    <div class="container">
-      <div {{if .BoundingBox }} class="container-inner" {{end}}>
-        {{ .Content }}
-      </div>
+    <div class="docs-shell{{if .ShowSidebar}} docs-shell-sidebar{{end}}{{if .TOC}} docs-shell-toc{{end}}">
+      {{if .ShowSidebar}}
+      <aside class="docs-sidebar" aria-label="Markdown articles">
+        <div class="docs-sidebar-title">Articles</div>
+        {{if .Articles}}
+        <nav>
+          <ol>
+            {{range .Articles}}
+            <li>
+              <a {{if .Active}}class="active" aria-current="page"{{end}} href="{{.Path}}">{{.Title}}</a>
+            </li>
+            {{end}}
+          </ol>
+        </nav>
+        {{else}}
+        <p class="docs-sidebar-empty">No Markdown files</p>
+        {{end}}
+      </aside>
+      {{end}}
+
+      <main class="docs-main">
+        <div class="container">
+          <div {{if .BoundingBox }} class="container-inner" {{end}}>
+            {{ .Content }}
+          </div>
+        </div>
+      </main>
+
+      {{if .TOC}}
+      <aside class="docs-toc" aria-label="Table of contents">
+        <div class="docs-toc-title">On this page</div>
+        <nav>
+          <ol>
+            {{range .TOC}}
+            <li class="toc-level-{{.Level}}">
+              <a href="#{{.ID}}">{{.Text}}</a>
+            </li>
+            {{end}}
+          </ol>
+        </nav>
+      </aside>
+      {{end}}
     </div>
+
     {{if .BoundingBox}}
-    <footer class="container footer">Made with &hearts; by chrishrb</footer>
+    <footer class="container footer">
+      <div class="docs-footer-inner">
+        Made with &hearts; by chrishrb
+      </div>
+    </footer>
     {{end}}
   </body>
 </html>

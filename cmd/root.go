@@ -24,7 +24,15 @@ var rootCmd = &cobra.Command{
 		}
 
 		parser := internal.NewParser()
-		server := internal.NewServer(host, port, boundingBox, browser, !noReload, parser)
+		server := internal.NewServerWithOptions(internal.ServerOptions{
+			Host:         host,
+			Port:         port,
+			BoundingBox:  boundingBox,
+			Browser:      browser,
+			EnableReload: !noReload,
+			StrictPort:   cmd.Flags().Changed("port"),
+			Parser:       parser,
+		})
 		return server.Serve(file)
 	},
 }

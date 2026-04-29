@@ -89,33 +89,39 @@ go install github.com/chrishrb/go-grip@latest
 
 ## :hammer: Usage
 
-To render the `README.md` file simply execute:
+To render a single Markdown file, execute:
 
 ```bash
 go-grip README.md
-# or
+```
+
+Single-file mode renders only the selected article and adds a table of contents for the current page.
+
+To browse all Markdown files in the current directory, execute:
+
+```bash
 go-grip
+# or
+go-grip .
 ```
 
-The browser will automatically open on http://localhost:6419. You can disable this behaviour with the `-b=false` option.
+Directory mode opens a local documentation view with a sidebar that links to each Markdown file in the directory. The selected article is rendered in the main area with its own table of contents.
 
-You can also specify a port:
+You can also open another directory:
 
 ```bash
-go-grip -p 80 README.md
+go-grip docs
 ```
 
-or just open a file-tree with all available files in the current directory:
+The browser will automatically open on http://localhost:6419. If that default port is already in use, go-grip will automatically try the next available port. You can disable opening the browser with the `-b=false` option.
+
+You can specify a strict port:
 
 ```bash
-go-grip -r=false
+go-grip -p 8080 README.md
 ```
 
-It's also possible to activate the darkmode:
-
-```bash
-go-grip -d .
-```
+When a port is specified explicitly, go-grip will report an error if that port is unavailable.
 
 To disable automatic browser reload on file changes (useful for stable editing):
 
