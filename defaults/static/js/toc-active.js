@@ -20,6 +20,25 @@
     }
   }
 
+  function keepActiveLinkVisible(link) {
+    var toc = link.closest(".docs-toc");
+    if (!toc) {
+      return;
+    }
+
+    var padding = 24;
+    var linkTop = link.offsetTop;
+    var linkBottom = linkTop + link.offsetHeight;
+    var visibleTop = toc.scrollTop;
+    var visibleBottom = visibleTop + toc.clientHeight;
+
+    if (linkTop < visibleTop + padding) {
+      toc.scrollTop = Math.max(0, linkTop - padding);
+    } else if (linkBottom > visibleBottom - padding) {
+      toc.scrollTop = linkBottom - toc.clientHeight + padding;
+    }
+  }
+
   function setActive(link, links) {
     links.forEach(function (item) {
       item.classList.toggle("active", item === link);
@@ -29,6 +48,10 @@
         item.removeAttribute("aria-current");
       }
     });
+
+    if (link) {
+      keepActiveLinkVisible(link);
+    }
   }
 
   function scrollBehavior() {
@@ -40,6 +63,18 @@
 
   function scrollY() {
     return window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
+  }
+
+  function documentHeight() {
+    var body = document.body;
+    var doc = document.documentElement;
+    return Math.max(
+      body.scrollHeight,
+      body.offsetHeight,
+      doc.clientHeight,
+      doc.scrollHeight,
+      doc.offsetHeight
+    );
   }
 
   function targetTop(target) {
@@ -73,6 +108,10 @@
     }
 
     function activePairForScroll() {
+      if (scrollY() + window.innerHeight >= documentHeight() - 2) {
+        return pairs[pairs.length - 1];
+      }
+
       var marker = scrollY() + 96;
       var activePair = pairs[0];
 
