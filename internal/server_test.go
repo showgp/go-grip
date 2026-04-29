@@ -122,6 +122,7 @@ func TestDirectoryMarkdownResponseIncludesSidebarAndTOC(t *testing.T) {
 		`guide.md`,
 		`aria-current="page"`,
 		`class="docs-toc"`,
+		`/static/js/toc-active.js`,
 		`href="#hello"`,
 		`href="#setup"`,
 	} {

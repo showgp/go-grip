@@ -225,6 +225,13 @@ Suggested behavior:
 - [x] Manually test directory mode with multiple Markdown files.
 - [x] Manually test default-port conflict fallback.
 
+### Phase 7: TOC Interaction Polish
+
+- [x] Add smooth scrolling when clicking right-side TOC entries.
+- [x] Add active highlighting for the current right-side TOC entry while scrolling.
+- [x] Preserve reduced-motion preferences.
+- [x] Add template coverage for the TOC interaction script.
+
 ## Acceptance Criteria
 
 - Running `go-grip README.md` renders the selected file with a current-article TOC and no article-list sidebar.
@@ -243,6 +250,7 @@ Suggested behavior:
 | --- | --- | --- |
 | 2026-04-29 | Planned | Initial implementation plan created. |
 | 2026-04-29 | Implemented | Added TOC metadata generation, directory sidebar navigation, single-file/directory mode routing, default-port fallback, README updates, and automated tests. |
+| 2026-04-29 | Polished | Added smooth TOC scrolling and current-section highlighting for the right-side article TOC. |
 
 ## Implementation Notes
 
@@ -253,6 +261,10 @@ Suggested behavior:
 - Single-file mode does not show the article sidebar and returns `404` for other Markdown files in the same directory.
 - Default-port fallback is implemented through an explicit listener before browser launch, so the printed/opened URL uses the actual selected port.
 - Explicit `--port` remains strict and reports a bind error if unavailable.
+- Right-side TOC interactions are handled by `defaults/static/js/toc-active.js`.
+- Smooth scrolling is CSS-backed and also triggered from TOC clicks; reduced-motion preference disables CSS and scripted smooth scrolling.
+- The active TOC item uses `aria-current="location"` so the visual state has an accessibility signal.
+- Active TOC detection is based on document scroll position and heading offsets, avoiding viewport observer lag near heading boundaries.
 
 ## Decisions
 
