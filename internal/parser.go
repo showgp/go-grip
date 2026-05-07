@@ -51,6 +51,7 @@ func (m Parser) Render(input []byte) (*RenderedDocument, error) {
 	md := newMarkdown()
 	reader := text.NewReader(input)
 	doc := md.Parser().Parse(reader)
+	promoteCJKStrongEmphasis(doc, input)
 	toc := collectTOC(doc, input)
 
 	var buf bytes.Buffer
