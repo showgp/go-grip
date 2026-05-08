@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/aarol/reload"
@@ -224,6 +225,7 @@ func (s *Server) newPageData(target serveTarget, currentFile string, content tem
 		CssCodeLight: template.CSS(getCssCode("github")),
 		CssCodeDark:  template.CSS(getCssCode("github-dark")),
 		ShowSidebar:  target.mode == modeDirectory,
+		SidebarTitle: sidebarTitle(target),
 		Articles:     articles,
 		TOC:          toc,
 	}, nil
@@ -251,6 +253,7 @@ type htmlStruct struct {
 	CssCodeLight template.CSS
 	CssCodeDark  template.CSS
 	ShowSidebar  bool
+	SidebarTitle string
 	Articles     []Article
 	TOC          []TOCEntry
 }
@@ -296,6 +299,18 @@ func urlPathEscape(file string) string {
 		parts[i] = url.PathEscape(parts[i])
 	}
 	return strings.Join(parts, "/")
+}
+
+func sidebarTitle(target serveTarget) string {
+	if target.mode != modeDirectory {
+		return ""
+	}
+
+	title := filepath.Base(filepath.Clean(target.rootDir))
+	if title == "." || title == string(filepath.Separator) {
+		return "Articles"
+	}
+	return title
 }
 
 func getCssCode(style string) string {

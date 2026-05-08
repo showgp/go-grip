@@ -39,7 +39,8 @@
     }
   }
 
-  function setActive(link, links) {
+  function setActive(link, links, options) {
+    var keepVisible = !options || options.keepVisible !== false;
     links.forEach(function (item) {
       item.classList.toggle("active", item === link);
       if (item === link) {
@@ -49,7 +50,7 @@
       }
     });
 
-    if (link) {
+    if (link && keepVisible) {
       keepActiveLinkVisible(link);
     }
   }
@@ -127,8 +128,14 @@
     }
 
     var scheduled = false;
+    var lockedLink = null;
+    var unlockTimer = 0;
     function updateActive() {
       scheduled = false;
+      if (lockedLink) {
+        setActive(lockedLink, links, { keepVisible: false });
+        return;
+      }
       setActive(activePairForScroll().link, links);
     }
 
@@ -140,6 +147,17 @@
       window.requestAnimationFrame(updateActive);
     }
 
+    function unlockNavigation() {
+      lockedLink = null;
+      window.clearTimeout(unlockTimer);
+      scheduleUpdate();
+    }
+
+    function scheduleUnlockFallback() {
+      window.clearTimeout(unlockTimer);
+      unlockTimer = window.setTimeout(unlockNavigation, 180);
+    }
+
     links.forEach(function (link) {
       link.addEventListener("click", function (event) {
         var target = findTarget(link);
@@ -148,19 +166,32 @@
         }
 
         event.preventDefault();
-        setActive(link, links);
+        lockedLink = link;
+        setActive(link, links, { keepVisible: false });
         history.pushState(null, "", link.getAttribute("href"));
         target.scrollIntoView({
           behavior: scrollBehavior(),
           block: "start",
         });
-        window.setTimeout(scheduleUpdate, 80);
+        scheduleUnlockFallback();
       });
     });
 
-    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener(
+      "scroll",
+      function () {
+        if (lockedLink) {
+          scheduleUnlockFallback();
+        }
+        scheduleUpdate();
+      },
+      { passive: true }
+    );
+    window.addEventListener("scrollend", unlockNavigation);
     window.addEventListener("resize", scheduleUpdate);
-    window.addEventListener("hashchange", scheduleUpdate);
+    window.addEventListener("hashchange", function () {
+      unlockNavigation();
+    });
 
     var hashLink = links.find(function (link) {
       return link.getAttribute("href") === window.location.hash;

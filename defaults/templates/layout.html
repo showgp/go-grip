@@ -66,7 +66,7 @@
     <div class="docs-shell{{if .ShowSidebar}} docs-shell-sidebar{{end}}{{if .TOC}} docs-shell-toc{{end}}">
       {{if .ShowSidebar}}
       <aside class="docs-sidebar" aria-label="Markdown articles">
-        <div class="docs-sidebar-title">Articles</div>
+        <div class="docs-sidebar-title">{{.SidebarTitle}}</div>
         {{if .Articles}}
         <nav>
           {{template "articleList" .Articles}}

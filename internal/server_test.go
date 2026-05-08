@@ -153,6 +153,7 @@ func TestDirectoryMarkdownResponseIncludesSidebarAndTOC(t *testing.T) {
 	body := recorder.Body.String()
 	for _, want := range []string{
 		`class="docs-sidebar"`,
+		`class="docs-sidebar-title">` + filepath.Base(tmpDir) + `</div>`,
 		`README.md`,
 		`guide.md`,
 		`aria-current="page"`,
@@ -165,6 +166,36 @@ func TestDirectoryMarkdownResponseIncludesSidebarAndTOC(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected body to contain %q, got %q", want, body)
 		}
+	}
+}
+
+func TestDirectorySidebarTitleUsesRootDirectoryName(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	rootDir := filepath.Join(tmpDir, "reference")
+	if err := os.Mkdir(rootDir, 0o755); err != nil {
+		t.Fatalf("mkdir root dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(rootDir, "README.md"), []byte("# Hello\n"), 0o644); err != nil {
+		t.Fatalf("write README.md: %v", err)
+	}
+
+	server := NewServer("localhost", 6419, false, false, false, NewParser())
+	handler := server.newHandlerForTarget(serveTarget{
+		mode:    modeDirectory,
+		rootDir: rootDir,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/README.md", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
+	}
+	if !strings.Contains(recorder.Body.String(), `class="docs-sidebar-title">reference</div>`) {
+		t.Fatalf("expected sidebar title to use root directory name, got %q", recorder.Body.String())
 	}
 }
 
