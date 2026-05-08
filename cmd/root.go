@@ -17,6 +17,7 @@ var rootCmd = &cobra.Command{
 		port, _ := cmd.Flags().GetInt("port")
 		boundingBox, _ := cmd.Flags().GetBool("bounding-box")
 		noReload, _ := cmd.Flags().GetBool("no-reload")
+		recursive, _ := cmd.Flags().GetBool("recursive")
 
 		var file string
 		if len(args) == 1 {
@@ -31,6 +32,7 @@ var rootCmd = &cobra.Command{
 			Browser:      browser,
 			EnableReload: !noReload,
 			StrictPort:   cmd.Flags().Changed("port"),
+			Recursive:    recursive,
 			Parser:       parser,
 		})
 		return server.Serve(file)
@@ -50,4 +52,5 @@ func init() {
 	rootCmd.Flags().IntP("port", "p", 6419, "Port to use")
 	rootCmd.Flags().Bool("bounding-box", true, "Add bounding box to HTML")
 	rootCmd.Flags().Bool("no-reload", false, "Disable automatic browser reload on file changes")
+	rootCmd.Flags().BoolP("recursive", "r", false, "Include nested Markdown files in directory sidebar")
 }

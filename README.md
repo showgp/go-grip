@@ -77,6 +77,7 @@ Distribution changes:
 - 📄 Render markdown to HTML and view it in your browser
 - Browse all Markdown files in a directory from a local documentation sidebar
 - Multi-file Markdown preview with article navigation
+- Optional recursive directory sidebar with `-r`
 - Per-page table of contents for rendered documents
 - Active table-of-contents highlighting while scrolling
 - 📱 Dark and light theme
@@ -202,6 +203,14 @@ You can also open another directory:
 
 ```bash
 go-grip docs
+```
+
+To include Markdown files from subdirectories and show them as a nested sidebar tree:
+
+```bash
+go-grip -r docs
+# or
+go-grip --recursive docs
 ```
 
 The browser will automatically open on http://localhost:6419. If that default port is already in use, go-grip will automatically try the next available port. You can disable opening the browser with the `-b=false` option.

@@ -25,6 +25,7 @@ type Server struct {
 	browser      bool
 	enableReload bool
 	strictPort   bool
+	recursive    bool
 }
 
 type ServerOptions struct {
@@ -34,6 +35,7 @@ type ServerOptions struct {
 	Browser      bool
 	EnableReload bool
 	StrictPort   bool
+	Recursive    bool
 	Parser       *Parser
 }
 
@@ -59,6 +61,7 @@ func NewServerWithOptions(opts ServerOptions) *Server {
 		browser:      opts.Browser,
 		enableReload: opts.EnableReload,
 		strictPort:   opts.StrictPort,
+		recursive:    opts.Recursive,
 		parser:       opts.Parser,
 	}
 }
@@ -93,7 +96,7 @@ func (s *Server) Serve(file string) error {
 		return err
 	}
 
-	initialPath, err := initialPathForTarget(target)
+	initialPath, err := initialPathForTarget(target, s.recursive)
 	if err != nil {
 		_ = listener.Close()
 		return err
@@ -129,7 +132,7 @@ func (s *Server) newHandlerForTarget(target serveTarget) http.Handler {
 		requestFile := cleanRequestPath(r.URL.Path)
 		if requestFile == "" {
 			setNoCacheHeaders(w)
-			initialPath, err := initialPathForTarget(target)
+			initialPath, err := initialPathForTarget(target, s.recursive)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -208,7 +211,7 @@ func (s *Server) renderEmpty(w http.ResponseWriter, target serveTarget) {
 func (s *Server) newPageData(target serveTarget, currentFile string, content template.HTML, toc []TOCEntry) (htmlStruct, error) {
 	var articles []Article
 	if target.mode == modeDirectory {
-		discovered, err := discoverArticles(target.rootDir)
+		discovered, err := discoverArticles(target.rootDir, s.recursive)
 		if err != nil {
 			return htmlStruct{}, err
 		}
@@ -262,12 +265,12 @@ func serveTemplate(w http.ResponseWriter, html htmlStruct) error {
 	return err
 }
 
-func initialPathForTarget(target serveTarget) (string, error) {
+func initialPathForTarget(target serveTarget, recursive bool) (string, error) {
 	if target.mode == modeSingleFile {
 		return "/" + urlPathEscape(target.initialFile), nil
 	}
 
-	articles, err := discoverArticles(target.rootDir)
+	articles, err := discoverArticles(target.rootDir, recursive)
 	if err != nil {
 		return "", err
 	}
@@ -288,7 +291,11 @@ func cleanRequestPath(requestPath string) string {
 }
 
 func urlPathEscape(file string) string {
-	return url.PathEscape(file)
+	parts := strings.Split(file, "/")
+	for i := range parts {
+		parts[i] = url.PathEscape(parts[i])
+	}
+	return strings.Join(parts, "/")
 }
 
 func getCssCode(style string) string {

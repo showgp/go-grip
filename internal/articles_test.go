@@ -26,7 +26,15 @@ func TestDiscoverArticlesSortsReadmeFirstAndIgnoresNonMarkdown(t *testing.T) {
 		t.Fatalf("mkdir nested.md: %v", err)
 	}
 
-	articles, err := discoverArticles(tmpDir)
+	nestedDir := filepath.Join(tmpDir, "nested")
+	if err := os.Mkdir(nestedDir, 0o755); err != nil {
+		t.Fatalf("mkdir nested: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(nestedDir, "guide.md"), []byte("# Nested\n"), 0o644); err != nil {
+		t.Fatalf("write nested guide: %v", err)
+	}
+
+	articles, err := discoverArticles(tmpDir, false)
 	if err != nil {
 		t.Fatalf("discover articles: %v", err)
 	}
@@ -42,19 +50,84 @@ func TestDiscoverArticlesSortsReadmeFirstAndIgnoresNonMarkdown(t *testing.T) {
 	}
 }
 
+func TestDiscoverArticlesRecursiveBuildsDirectoryTree(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	files := map[string]string{
+		"README.md":                 "# Readme\n",
+		"zeta.md":                   "# Zeta\n",
+		"docs/guide.md":             "# Guide\n",
+		"docs/api/reference.md":     "# Reference\n",
+		"docs/中文 guide.md":          "# Localized\n",
+		"docs/assets/ignored.txt":   "ignored\n",
+		"empty-directory/notes.txt": "ignored\n",
+	}
+	for name, content := range files {
+		path := filepath.Join(tmpDir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", filepath.Dir(path), err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+
+	articles, err := discoverArticles(tmpDir, true)
+	if err != nil {
+		t.Fatalf("discover recursive articles: %v", err)
+	}
+
+	if len(articles) != 3 {
+		t.Fatalf("expected 3 root articles, got %d: %#v", len(articles), articles)
+	}
+	if articles[0].Filename != "README.md" {
+		t.Fatalf("expected root README first, got %#v", articles[0])
+	}
+
+	docs := articles[1]
+	if !docs.IsDirectory || docs.Title != "docs" {
+		t.Fatalf("expected docs directory second, got %#v", docs)
+	}
+	if len(docs.Children) != 3 {
+		t.Fatalf("expected 3 docs children, got %d: %#v", len(docs.Children), docs.Children)
+	}
+	if !docs.Children[0].IsDirectory || docs.Children[0].Title != "api" {
+		t.Fatalf("expected api directory first under docs, got %#v", docs.Children[0])
+	}
+	if got := docs.Children[0].Children[0].Path; got != "/docs/api/reference.md" {
+		t.Fatalf("expected nested escaped path, got %q", got)
+	}
+	if got := docs.Children[2].Path; got != "/docs/%E4%B8%AD%E6%96%87%20guide.md" {
+		t.Fatalf("expected escaped localized path, got %q", got)
+	}
+	if articles[2].Filename != "zeta.md" {
+		t.Fatalf("expected zeta last, got %#v", articles[2])
+	}
+}
+
 func TestArticlesWithActiveMarksCurrentArticle(t *testing.T) {
 	t.Parallel()
 
 	articles := []Article{
 		{Filename: "README.md"},
-		{Filename: "guide.md"},
+		{
+			Title:       "docs",
+			IsDirectory: true,
+			Children: []Article{
+				{Filename: "docs/guide.md"},
+			},
+		},
 	}
-	active := articlesWithActive(articles, "guide.md")
+	active := articlesWithActive(articles, "docs/guide.md")
 
 	if active[0].Active {
 		t.Fatalf("expected README.md to be inactive")
 	}
-	if !active[1].Active {
-		t.Fatalf("expected guide.md to be active")
+	if !active[1].Expanded {
+		t.Fatalf("expected docs directory to be expanded")
+	}
+	if !active[1].Children[0].Active {
+		t.Fatalf("expected docs/guide.md to be active")
 	}
 }

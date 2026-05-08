@@ -1,3 +1,27 @@
+{{define "articleList"}}
+<ul class="docs-sidebar-list">
+  {{range .}}
+  <li class="{{if .IsDirectory}}docs-sidebar-directory{{else}}docs-sidebar-article{{end}}{{if .Expanded}} expanded{{end}}">
+    {{if .IsDirectory}}
+    <details class="docs-sidebar-details"{{if .Expanded}} open{{end}}>
+      <summary class="docs-sidebar-folder">
+        <svg class="docs-sidebar-folder-icon" aria-hidden="true" viewBox="0 0 24 24">
+          <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h4.1l2 2.5h6.9A2.5 2.5 0 0 1 21 10v7.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z"/>
+        </svg>
+        <span class="docs-sidebar-label">{{.Title}}</span>
+        <span class="docs-sidebar-chevron" aria-hidden="true"></span>
+      </summary>
+    {{if .Children}}{{template "articleList" .Children}}{{end}}
+    </details>
+    {{else}}
+    <a {{if .Active}}class="active" aria-current="page"{{end}} href="{{.Path}}">
+      <span class="docs-sidebar-label">{{.Title}}</span>
+    </a>
+    {{end}}
+  </li>
+  {{end}}
+</ul>
+{{end}}
 <!doctype html>
 <html>
   <head>
@@ -32,6 +56,7 @@
     <script src="/static/js/mermaid.min.js"></script>
     <script src="/static/js/mermaid-init.js"></script>
     <script src="/static/js/toc-active.js"></script>
+    <script src="/static/js/sidebar-active.js"></script>
   </head>
 
   <body class="markdown-body">
@@ -44,13 +69,7 @@
         <div class="docs-sidebar-title">Articles</div>
         {{if .Articles}}
         <nav>
-          <ol>
-            {{range .Articles}}
-            <li>
-              <a {{if .Active}}class="active" aria-current="page"{{end}} href="{{.Path}}">{{.Title}}</a>
-            </li>
-            {{end}}
-          </ol>
+          {{template "articleList" .Articles}}
         </nav>
         {{else}}
         <p class="docs-sidebar-empty">No Markdown files</p>

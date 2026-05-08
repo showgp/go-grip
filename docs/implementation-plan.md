@@ -137,9 +137,10 @@ For the first pass:
 - Put `README.md` first when present.
 - Store each article with display title and URL path.
 
-Later enhancement:
+Recursive enhancement:
 
-- Add `--recursive` to include nested Markdown files.
+- Add `--recursive` / `-r` to include nested Markdown files.
+- Render recursive results as a nested sidebar tree.
 
 ### Layout
 
@@ -232,6 +233,13 @@ Suggested behavior:
 - [x] Preserve reduced-motion preferences.
 - [x] Add template coverage for the TOC interaction script.
 
+### Phase 8: Recursive Directory Navigation
+
+- [x] Add `--recursive` / `-r` for nested Markdown discovery in directory mode.
+- [x] Preserve root-only directory discovery by default.
+- [x] Render nested directories as a sidebar tree.
+- [x] Add tests for recursive article discovery and nested Markdown routing.
+
 ## Acceptance Criteria
 
 - Running `go-grip README.md` renders the selected file with a current-article TOC and no article-list sidebar.
@@ -251,12 +259,14 @@ Suggested behavior:
 | 2026-04-29 | Planned | Initial implementation plan created. |
 | 2026-04-29 | Implemented | Added TOC metadata generation, directory sidebar navigation, single-file/directory mode routing, default-port fallback, README updates, and automated tests. |
 | 2026-04-29 | Polished | Added smooth TOC scrolling and current-section highlighting for the right-side article TOC. |
+| 2026-05-08 | Implemented | Added opt-in recursive directory navigation with `--recursive` / `-r` and nested sidebar rendering. |
 
 ## Implementation Notes
 
 - `internal.Parser.Render` now returns `RenderedDocument`, including rendered HTML and TOC entries.
 - `MdToHTML` remains as a compatibility wrapper around the new render result.
 - Directory mode scans only the selected root directory for `.md` files in this pass.
+- Recursive directory mode is opt-in with `--recursive` / `-r` and includes nested `.md` files in a tree sidebar.
 - Directory mode shows filenames in the sidebar and marks the current file as active.
 - Single-file mode does not show the article sidebar and returns `404` for other Markdown files in the same directory.
 - Default-port fallback is implemented through an explicit listener before browser launch, so the printed/opened URL uses the actual selected port.
@@ -276,11 +286,11 @@ Suggested behavior:
 | Default port can auto-fallback, explicit port stays strict | This balances convenience with predictable user intent. |
 | Do not merge all Markdown files into one page in the first pass | Separate article navigation avoids large pages, heading collisions, and slower rendering. |
 | Scan only root-level Markdown files in the first pass | This keeps navigation predictable and leaves recursive discovery for a dedicated option. |
+| Keep recursive scanning behind `--recursive` / `-r` | This preserves existing directory-mode behavior while making deeper documentation trees available when requested. |
 | Display filenames in the article sidebar | Filename display is deterministic and avoids parsing every document just to build navigation. |
 | Place TOC on the right at wide widths and stack it on narrow screens | This keeps reading space stable on desktop while preserving mobile usability. |
 
 ## Open Questions
 
 - Should hidden files and directories be ignored by default?
-- Should recursive directory scanning be added behind a `--recursive` option?
 - Should the sidebar optionally derive article titles from each file's first `h1` heading?
