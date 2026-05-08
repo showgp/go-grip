@@ -439,13 +439,19 @@
     position: static;
     width: auto;
     max-width: none;
-    max-height: calc(100vh - 32px);
     margin-bottom: 16px;
   }
 
+  .docs-sidebar {
+    max-height: calc(100vh - 32px);
+  }
+
+  .docs-toc {
+    max-height: none;
+  }
+
   @supports (height: 100dvh) {
-    .docs-sidebar,
-    .docs-toc {
+    .docs-sidebar {
       max-height: calc(100dvh - 32px);
     }
   }
