@@ -14,16 +14,19 @@
 
 ## Table of Contents
 
-- [About](#question-about)
-- [Fork status](#twisted_rightwards_arrows-fork-status)
-- [Differences from upstream](#sparkles-differences-from-upstream)
-- [Features](#zap-features)
-- [Getting started](#rocket-getting-started)
-- [Releasing](#package-releasing)
-- [Usage](#hammer-usage)
-- [Examples](#pencil-examples)
-- [Known TODOs / Bugs](#bug-known-todos--bugs)
-- [Similar tools](#pushpin-similar-tools)
+- [Table of Contents](#table-of-contents)
+- [:question: About](#question-about)
+- [:twisted\_rightwards\_arrows: Fork status](#twisted_rightwards_arrows-fork-status)
+- [:sparkles: Differences from upstream](#sparkles-differences-from-upstream)
+- [:zap: Features](#zap-features)
+- [:rocket: Getting started](#rocket-getting-started)
+  - [Download a prebuilt binary](#download-a-prebuilt-binary)
+  - [Install with Go](#install-with-go)
+- [:package: Releasing](#package-releasing)
+- [:hammer: Usage](#hammer-usage)
+- [:pencil: Examples](#pencil-examples)
+- [:bug: Known TODOs / Bugs](#bug-known-todos--bugs)
+- [:pushpin: Similar tools](#pushpin-similar-tools)
 
 ## :question: About
 
@@ -170,6 +173,10 @@ git push github v0.1.0
 ```
 
 The release workflow runs tests, builds macOS/Linux/Windows binaries, uploads archives to GitHub Releases, and includes `checksums.txt` for verification.
+
+> [!IMPORTANT]
+> Push release tags one at a time. Do not use `git push --tags` for releases: if multiple tags are created in one push, GitHub may skip creating tag push events, so the release workflow will not run.
+>
 
 ## :hammer: Usage
 
