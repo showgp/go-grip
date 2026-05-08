@@ -17,7 +17,14 @@
     return browserPrefers();
   }
 
-  function applyTheme(mode) {
+  function setThemeAttribute(mode) {
+    document.documentElement.setAttribute("data-theme", mode);
+    if (document.body) {
+      document.body.setAttribute("data-theme", mode);
+    }
+  }
+
+  function applyThemeMedia(mode) {
     var lightCSS = document.getElementById("theme-light");
     var darkCSS = document.getElementById("theme-dark");
     var lightHL = document.getElementById("highlight-light");
@@ -28,14 +35,17 @@
       if (darkCSS) darkCSS.media = "all";
       if (lightHL) lightHL.media = "not all";
       if (darkHL) darkHL.media = "all";
-      document.body.setAttribute("data-theme", "dark");
     } else {
       if (lightCSS) lightCSS.media = "all";
       if (darkCSS) darkCSS.media = "not all";
       if (lightHL) lightHL.media = "all";
       if (darkHL) darkHL.media = "not all";
-      document.body.setAttribute("data-theme", "light");
     }
+  }
+
+  function applyTheme(mode) {
+    applyThemeMedia(mode);
+    setThemeAttribute(mode);
 
     updateIcon(mode);
 
@@ -43,9 +53,11 @@
       localStorage.setItem(STORAGE_KEY, mode);
     } catch (e) {}
 
-    document.body.dispatchEvent(
-      new CustomEvent("themechange", { detail: { mode: mode } })
-    );
+    if (document.body) {
+      document.body.dispatchEvent(
+        new CustomEvent("themechange", { detail: { mode: mode } })
+      );
+    }
   }
 
   function updateIcon(mode) {
@@ -67,6 +79,10 @@
     var current = getPreference();
     applyTheme(current === "light" ? "dark" : "light");
   }
+
+  var initialTheme = getPreference();
+  applyThemeMedia(initialTheme);
+  setThemeAttribute(initialTheme);
 
   document.addEventListener("DOMContentLoaded", function () {
     applyTheme(getPreference());
