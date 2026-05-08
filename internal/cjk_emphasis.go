@@ -70,9 +70,8 @@ func promoteCJKStrongTextRun(parent gast.Node, first *gast.Text, last *gast.Text
 	}
 
 	cursor := 0
-	var lastInserted gast.Node
 	for _, strong := range ranges {
-		lastInserted = insertTextSegmentBefore(parent, first, first.Segment.Start+cursor, first.Segment.Start+strong.start)
+		insertTextSegmentBefore(parent, first, first.Segment.Start+cursor, first.Segment.Start+strong.start)
 
 		emphasis := gast.NewEmphasis(2)
 		emphasis.AppendChild(emphasis, gast.NewTextSegment(text.NewSegment(
@@ -80,15 +79,14 @@ func promoteCJKStrongTextRun(parent gast.Node, first *gast.Text, last *gast.Text
 			first.Segment.Start+strong.contentEnd,
 		)))
 		parent.InsertBefore(parent, first, emphasis)
-		lastInserted = emphasis
 
 		cursor = strong.end
 	}
-	lastInserted = insertTextSegmentBefore(parent, first, first.Segment.Start+cursor, last.Segment.Stop)
+	trailingText := insertTextSegmentBefore(parent, first, first.Segment.Start+cursor, last.Segment.Stop)
 
 	if last.SoftLineBreak() || last.HardLineBreak() {
-		lineBreakCarrier, ok := lastInserted.(*gast.Text)
-		if !ok {
+		lineBreakCarrier := trailingText
+		if lineBreakCarrier == nil {
 			lineBreakCarrier = gast.NewTextSegment(text.NewSegment(last.Segment.Stop, last.Segment.Stop))
 			parent.InsertBefore(parent, first, lineBreakCarrier)
 		}
@@ -104,7 +102,7 @@ func promoteCJKStrongTextRun(parent gast.Node, first *gast.Text, last *gast.Text
 	}
 }
 
-func insertTextSegmentBefore(parent gast.Node, anchor gast.Node, start int, stop int) gast.Node {
+func insertTextSegmentBefore(parent gast.Node, anchor gast.Node, start int, stop int) *gast.Text {
 	if start >= stop {
 		return nil
 	}
