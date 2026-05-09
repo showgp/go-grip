@@ -81,13 +81,9 @@ func TestDiscoverArticlesRecursiveBuildsDirectoryTree(t *testing.T) {
 	if len(articles) != 3 {
 		t.Fatalf("expected 3 root articles, got %d: %#v", len(articles), articles)
 	}
-	if articles[0].Filename != "README.md" {
-		t.Fatalf("expected root README first, got %#v", articles[0])
-	}
-
-	docs := articles[1]
+	docs := articles[0]
 	if !docs.IsDirectory || docs.Title != "docs" {
-		t.Fatalf("expected docs directory second, got %#v", docs)
+		t.Fatalf("expected docs directory first, got %#v", docs)
 	}
 	if len(docs.Children) != 3 {
 		t.Fatalf("expected 3 docs children, got %d: %#v", len(docs.Children), docs.Children)
@@ -100,6 +96,9 @@ func TestDiscoverArticlesRecursiveBuildsDirectoryTree(t *testing.T) {
 	}
 	if got := docs.Children[2].Path; got != "/docs/%E4%B8%AD%E6%96%87%20guide.md" {
 		t.Fatalf("expected escaped localized path, got %q", got)
+	}
+	if articles[1].Filename != "README.md" {
+		t.Fatalf("expected root README first among files, got %#v", articles[1])
 	}
 	if articles[2].Filename != "zeta.md" {
 		t.Fatalf("expected zeta last, got %#v", articles[2])
@@ -129,5 +128,38 @@ func TestArticlesWithActiveMarksCurrentArticle(t *testing.T) {
 	}
 	if !active[1].Children[0].Active {
 		t.Fatalf("expected docs/guide.md to be active")
+	}
+}
+
+func TestArticleNavigationUsesFlattenedSidebarOrder(t *testing.T) {
+	t.Parallel()
+
+	articles := []Article{
+		{
+			Title:       "docs",
+			IsDirectory: true,
+			Children: []Article{
+				{Title: "guide.md", Filename: "docs/guide.md", Path: "/docs/guide.md"},
+				{Title: "reference.md", Filename: "docs/reference.md", Path: "/docs/reference.md"},
+			},
+		},
+		{Title: "README.md", Filename: "README.md", Path: "/README.md"},
+		{Title: "zeta.md", Filename: "zeta.md", Path: "/zeta.md"},
+	}
+
+	previous, next := articleNavigation(articles, "README.md")
+	if previous.Filename != "docs/reference.md" {
+		t.Fatalf("expected previous article from nested directory, got %#v", previous)
+	}
+	if next.Filename != "zeta.md" {
+		t.Fatalf("expected next article from root files, got %#v", next)
+	}
+
+	previous, next = articleNavigation(articles, "docs/guide.md")
+	if previous.Filename != "" {
+		t.Fatalf("expected first article to have no previous article, got %#v", previous)
+	}
+	if next.Filename != "docs/reference.md" {
+		t.Fatalf("expected next nested article, got %#v", next)
 	}
 }

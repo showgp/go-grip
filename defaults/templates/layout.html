@@ -57,9 +57,10 @@
     <script src="/static/js/mermaid-init.js"></script>
     <script src="/static/js/toc-active.js"></script>
     <script src="/static/js/sidebar-active.js"></script>
+    <script src="/static/js/article-nav.js"></script>
   </head>
 
-  <body class="markdown-body">
+  <body class="markdown-body"{{if .PreviousArticle.Path}} data-prev-article="{{.PreviousArticle.Path}}"{{end}}{{if .NextArticle.Path}} data-next-article="{{.NextArticle.Path}}"{{end}}>
     <button id="theme-toggle" class="theme-toggle" title="Toggle theme">
       <span class="theme-toggle-icon"></span>
     </button>
@@ -82,6 +83,24 @@
           <div {{if .BoundingBox }} class="container-inner" {{end}}>
             {{ .Content }}
           </div>
+          {{if or .PreviousArticle.Path .NextArticle.Path}}
+          <nav class="docs-page-nav" aria-label="Article navigation">
+            {{if .PreviousArticle.Path}}
+            <a class="docs-page-nav-link docs-page-nav-prev" href="{{.PreviousArticle.Path}}">
+              <span class="docs-page-nav-kicker">Previous</span>
+              <span class="docs-page-nav-title">{{.PreviousArticle.Title}}</span>
+            </a>
+            {{else}}
+            <span class="docs-page-nav-spacer" aria-hidden="true"></span>
+            {{end}}
+            {{if .NextArticle.Path}}
+            <a class="docs-page-nav-link docs-page-nav-next" href="{{.NextArticle.Path}}">
+              <span class="docs-page-nav-kicker">Next</span>
+              <span class="docs-page-nav-title">{{.NextArticle.Title}}</span>
+            </a>
+            {{end}}
+          </nav>
+          {{end}}
         </div>
       </main>
 

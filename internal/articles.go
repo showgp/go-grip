@@ -101,11 +101,47 @@ func initialArticle(articles []Article) string {
 	return ""
 }
 
+func articleNavigation(articles []Article, currentFile string) (Article, Article) {
+	flatArticles := flattenArticles(articles)
+	for i, article := range flatArticles {
+		if article.Filename != currentFile {
+			continue
+		}
+
+		var previous Article
+		var next Article
+		if i > 0 {
+			previous = flatArticles[i-1]
+		}
+		if i < len(flatArticles)-1 {
+			next = flatArticles[i+1]
+		}
+		return previous, next
+	}
+	return Article{}, Article{}
+}
+
+func flattenArticles(articles []Article) []Article {
+	result := make([]Article, 0)
+	for _, article := range articles {
+		if article.IsDirectory {
+			result = append(result, flattenArticles(article.Children)...)
+			continue
+		}
+		result = append(result, article)
+	}
+	return result
+}
+
 func isMarkdownFile(name string) bool {
 	return strings.EqualFold(filepath.Ext(name), ".md")
 }
 
 func articleLess(left Article, right Article) bool {
+	if left.IsDirectory != right.IsDirectory {
+		return left.IsDirectory
+	}
+
 	leftReadme := isReadmeArticle(left)
 	rightReadme := isReadmeArticle(right)
 	if leftReadme != rightReadme {

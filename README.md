@@ -52,7 +52,9 @@ Additional documentation browsing support:
 - Multi-file navigation: directory mode adds an article sidebar so related Markdown files can be opened without restarting the server.
 - Custom directory targets: running `go-grip docs` opens Markdown files from another directory.
 - The article sidebar title uses the selected directory name, making it easier to identify the active documentation folder.
+- The article sidebar sorts directories before files at each level, then sorts entries by name.
 - Recursive directory navigation is available with `-r` or `--recursive`, showing nested Markdown files as a collapsible tree.
+- Directory mode adds previous/next article navigation and supports the left/right arrow keys for moving between articles.
 
 Additional table-of-contents support:
 
@@ -82,6 +84,8 @@ Distribution changes:
 - Multi-file Markdown preview with article navigation
 - Optional recursive directory sidebar with `-r`
 - Directory sidebar titles show the active directory name
+- Directory-first sidebar sorting for mixed folder/file lists
+- Previous/next article links with left/right keyboard navigation
 - Per-page table of contents for rendered documents
 - Active table-of-contents highlighting while scrolling
 - 📱 Dark and light theme
@@ -201,7 +205,7 @@ go-grip
 go-grip .
 ```
 
-Directory mode opens a local documentation view with a sidebar that links to each Markdown file in the directory. The sidebar title shows the selected directory name. The selected article is rendered in the main area with its own table of contents.
+Directory mode opens a local documentation view with a sidebar that links to each Markdown file in the directory. The sidebar title shows the selected directory name. When folders and Markdown files appear at the same level, folders are shown first and entries are sorted by name. The selected article is rendered in the main area with its own table of contents and previous/next article navigation.
 
 You can also open another directory:
 
@@ -217,7 +221,7 @@ go-grip -r docs
 go-grip --recursive docs
 ```
 
-The recursive sidebar is collapsible and keeps the active article visible while browsing nested documents.
+The recursive sidebar is collapsible and keeps the active article visible while browsing nested documents. Previous/next navigation follows the same order as the sidebar, and the left/right arrow keys can move between articles when the page focus is not inside an editable field.
 
 The browser will automatically open on http://localhost:6419. If that default port is already in use, go-grip will automatically try the next available port. You can disable opening the browser with the `-b=false` option.
 

@@ -159,9 +159,55 @@ func TestDirectoryMarkdownResponseIncludesSidebarAndTOC(t *testing.T) {
 		`aria-current="page"`,
 		`class="docs-toc"`,
 		`/static/js/toc-active.js`,
+		`/static/js/article-nav.js`,
+		`data-next-article="/guide.md"`,
+		`class="docs-page-nav"`,
+		`href="/guide.md"`,
+		`class="docs-page-nav-title">guide.md</span>`,
 		`href="#hello"`,
 		`href="#setup"`,
 		`/static/js/sidebar-active.js`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("expected body to contain %q, got %q", want, body)
+		}
+	}
+}
+
+func TestDirectoryMarkdownResponseIncludesPreviousAndNextArticleNavigation(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	files := map[string]string{
+		"README.md": "# Readme\n",
+		"guide.md":  "# Guide\n",
+		"zeta.md":   "# Zeta\n",
+	}
+	for name, content := range files {
+		if err := os.WriteFile(filepath.Join(tmpDir, name), []byte(content), 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+
+	server := NewServer("localhost", 6419, false, false, false, NewParser())
+	handler := server.newHandlerForTarget(serveTarget{
+		mode:    modeDirectory,
+		rootDir: tmpDir,
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/guide.md", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
+	}
+	body := recorder.Body.String()
+	for _, want := range []string{
+		`data-prev-article="/README.md"`,
+		`data-next-article="/zeta.md"`,
+		`docs-page-nav-prev" href="/README.md"`,
+		`docs-page-nav-next" href="/zeta.md"`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Fatalf("expected body to contain %q, got %q", want, body)

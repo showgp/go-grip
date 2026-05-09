@@ -211,23 +211,28 @@ func (s *Server) renderEmpty(w http.ResponseWriter, target serveTarget) {
 
 func (s *Server) newPageData(target serveTarget, currentFile string, content template.HTML, toc []TOCEntry) (htmlStruct, error) {
 	var articles []Article
+	var previousArticle Article
+	var nextArticle Article
 	if target.mode == modeDirectory {
 		discovered, err := discoverArticles(target.rootDir, s.recursive)
 		if err != nil {
 			return htmlStruct{}, err
 		}
 		articles = articlesWithActive(discovered, currentFile)
+		previousArticle, nextArticle = articleNavigation(discovered, currentFile)
 	}
 
 	return htmlStruct{
-		Content:      content,
-		BoundingBox:  s.boundingBox,
-		CssCodeLight: template.CSS(getCssCode("github")),
-		CssCodeDark:  template.CSS(getCssCode("github-dark")),
-		ShowSidebar:  target.mode == modeDirectory,
-		SidebarTitle: sidebarTitle(target),
-		Articles:     articles,
-		TOC:          toc,
+		Content:         content,
+		BoundingBox:     s.boundingBox,
+		CssCodeLight:    template.CSS(getCssCode("github")),
+		CssCodeDark:     template.CSS(getCssCode("github-dark")),
+		ShowSidebar:     target.mode == modeDirectory,
+		SidebarTitle:    sidebarTitle(target),
+		Articles:        articles,
+		PreviousArticle: previousArticle,
+		NextArticle:     nextArticle,
+		TOC:             toc,
 	}, nil
 }
 
@@ -248,14 +253,16 @@ func readToString(dir http.Dir, filename string) ([]byte, error) {
 }
 
 type htmlStruct struct {
-	Content      template.HTML
-	BoundingBox  bool
-	CssCodeLight template.CSS
-	CssCodeDark  template.CSS
-	ShowSidebar  bool
-	SidebarTitle string
-	Articles     []Article
-	TOC          []TOCEntry
+	Content         template.HTML
+	BoundingBox     bool
+	CssCodeLight    template.CSS
+	CssCodeDark     template.CSS
+	ShowSidebar     bool
+	SidebarTitle    string
+	Articles        []Article
+	PreviousArticle Article
+	NextArticle     Article
+	TOC             []TOCEntry
 }
 
 func serveTemplate(w http.ResponseWriter, html htmlStruct) error {
