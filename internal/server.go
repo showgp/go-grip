@@ -2,21 +2,28 @@ package internal
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/aarol/reload"
 	chroma_html "github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/showgp/go-grip/defaults"
 )
+
+const maxEditSize = 10 << 20 // 10MB
+
+var editLocks sync.Map
 
 type Server struct {
 	parser       *Parser
@@ -128,6 +135,8 @@ func (s *Server) newHandlerForTarget(target serveTarget) http.Handler {
 	fileServer := http.FileServer(dir)
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.FileServer(http.FS(defaults.StaticFiles)))
+	mux.HandleFunc("/api/edit/", s.handleSave(dir))
+	mux.HandleFunc("/api/raw/", s.handleRaw(dir))
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		requestFile := cleanRequestPath(r.URL.Path)
@@ -185,7 +194,7 @@ func (s *Server) renderMarkdown(w http.ResponseWriter, dir http.Dir, target serv
 		return
 	}
 
-	page, err := s.newPageData(target, currentFile, template.HTML(rendered.Content), rendered.TOC)
+	page, err := s.newPageData(target, currentFile, template.HTML(rendered.Content), rendered.TOC, string(bytes))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -199,7 +208,7 @@ func (s *Server) renderEmpty(w http.ResponseWriter, target serveTarget) {
 	setNoCacheHeaders(w)
 
 	content := template.HTML(`<div class="docs-empty"><h1>No Markdown files found</h1><p>Add a Markdown file to this directory and refresh the page.</p></div>`)
-	page, err := s.newPageData(target, "", content, nil)
+	page, err := s.newPageData(target, "", content, nil, "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -209,7 +218,7 @@ func (s *Server) renderEmpty(w http.ResponseWriter, target serveTarget) {
 	}
 }
 
-func (s *Server) newPageData(target serveTarget, currentFile string, content template.HTML, toc []TOCEntry) (htmlStruct, error) {
+func (s *Server) newPageData(target serveTarget, currentFile string, content template.HTML, toc []TOCEntry, rawContent string) (htmlStruct, error) {
 	var articles []Article
 	var previousArticle Article
 	var nextArticle Article
@@ -233,6 +242,8 @@ func (s *Server) newPageData(target serveTarget, currentFile string, content tem
 		PreviousArticle: previousArticle,
 		NextArticle:     nextArticle,
 		TOC:             toc,
+		CurrentFile:     currentFile,
+		RawContent:      rawContent,
 	}, nil
 }
 
@@ -252,6 +263,132 @@ func readToString(dir http.Dir, filename string) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
+func (s *Server) handleSave(dir http.Dir) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+			return
+		}
+		file := strings.TrimPrefix(r.URL.Path, "/api/edit/")
+		absPath, err := validateEditPath(dir, file)
+		if err != nil {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+			return
+		}
+
+		if err := checkWritable(absPath); err != nil {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+			return
+		}
+
+		r.Body = http.MaxBytesReader(w, r.Body, maxEditSize)
+
+		content, err := io.ReadAll(r.Body)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "Request body too large"})
+			return
+		}
+
+		if err := writeToDir(absPath, content); err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to save file"})
+			return
+		}
+
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	}
+}
+
+// handleRaw serves the raw Markdown content of a file for the editor.
+
+func (s *Server) handleRaw(dir http.Dir) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+			return
+		}
+		file := strings.TrimPrefix(r.URL.Path, "/api/raw/")
+		absPath, err := validateEditPath(dir, file)
+		if err != nil {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+			return
+		}
+
+		content, err := os.ReadFile(absPath)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "File not found"})
+			return
+		}
+
+		setNoCacheHeaders(w)
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Write(content)
+	}
+}
+
+func validateEditPath(dir http.Dir, file string) (string, error) {
+	cleaned := strings.TrimPrefix(path.Clean("/"+file), "/")
+	if cleaned == "" || cleaned == "." {
+		return "", fmt.Errorf("invalid file path")
+	}
+	if !isMarkdownFile(cleaned) {
+		return "", fmt.Errorf("only .md files can be edited")
+	}
+
+	absRoot, err := filepath.Abs(string(dir))
+	if err != nil {
+		return "", fmt.Errorf("internal error")
+	}
+	absPath := filepath.Join(absRoot, filepath.FromSlash(cleaned))
+	resolved, err := filepath.EvalSymlinks(absPath)
+	if err != nil {
+		// If symlink resolution fails, fall back to clean absPath
+		resolved = absPath
+	}
+	cleanResolved := filepath.Clean(resolved)
+	cleanRoot := filepath.Clean(absRoot)
+	if !strings.HasPrefix(cleanResolved, cleanRoot+string(filepath.Separator)) && cleanResolved != cleanRoot {
+		return "", fmt.Errorf("path traversal detected")
+	}
+
+	if _, err := os.Stat(cleanResolved); os.IsNotExist(err) {
+		return "", fmt.Errorf("file no longer exists")
+	}
+
+	return cleanResolved, nil
+}
+
+func writeToDir(absPath string, data []byte) error {
+	muRaw, _ := editLocks.LoadOrStore(absPath, &sync.Mutex{})
+	mu := muRaw.(*sync.Mutex)
+	mu.Lock()
+	defer mu.Unlock()
+
+	tmpFile := absPath + ".tmp"
+	if err := os.WriteFile(tmpFile, data, 0644); err != nil {
+		os.Remove(tmpFile)
+		return err
+	}
+	return os.Rename(tmpFile, absPath)
+}
+
+func checkWritable(absPath string) error {
+	f, err := os.OpenFile(absPath, os.O_WRONLY, 0)
+	if err != nil {
+		if os.IsPermission(err) {
+			return fmt.Errorf("permission denied: cannot write to file")
+		}
+		return fmt.Errorf("cannot open file for writing")
+	}
+	f.Close()
+	return nil
+}
+
+func writeJSON(w http.ResponseWriter, status int, data map[string]string) {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(data)
+}
+
 type htmlStruct struct {
 	Content         template.HTML
 	BoundingBox     bool
@@ -263,6 +400,8 @@ type htmlStruct struct {
 	PreviousArticle Article
 	NextArticle     Article
 	TOC             []TOCEntry
+	CurrentFile     string
+	RawContent      string
 }
 
 func serveTemplate(w http.ResponseWriter, html htmlStruct) error {

@@ -39,6 +39,7 @@
         event.ctrlKey ||
         event.metaKey ||
         event.shiftKey ||
+        document.body.getAttribute("data-editing") === "true" ||
         isEditableTarget(event.target) ||
         hasTextSelection()
       ) {

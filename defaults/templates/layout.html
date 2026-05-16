@@ -49,6 +49,7 @@
     <link rel="stylesheet" href="/static/css/mathjax.css" />
     <link rel="stylesheet" href="/static/css/theme-switch.css" />
     <link rel="stylesheet" href="/static/css/docs-layout.css" />
+    <link rel="stylesheet" href="/static/css/editor.css" />
     <script src="/static/js/theme-switch.js"></script>
     <script src="/static/js/clipboard-copy.js"></script>
     <script src="/static/js/mathjax-options.js"></script>
@@ -58,9 +59,10 @@
     <script src="/static/js/toc-active.js"></script>
     <script src="/static/js/sidebar-active.js"></script>
     <script src="/static/js/article-nav.js"></script>
+    <script src="/static/js/editor.js" defer></script>
   </head>
 
-  <body class="markdown-body"{{if .PreviousArticle.Path}} data-prev-article="{{.PreviousArticle.Path}}"{{end}}{{if .NextArticle.Path}} data-next-article="{{.NextArticle.Path}}"{{end}}>
+  <body class="markdown-body"{{if .PreviousArticle.Path}} data-prev-article="{{.PreviousArticle.Path}}"{{end}}{{if .NextArticle.Path}} data-next-article="{{.NextArticle.Path}}"{{end}} data-current-file="{{.CurrentFile}}">
     <button id="theme-toggle" class="theme-toggle" title="Toggle theme">
       <span class="theme-toggle-icon"></span>
     </button>
@@ -80,8 +82,29 @@
 
       <main class="docs-main">
         <div class="container">
-          <div {{if .BoundingBox }} class="container-inner" {{end}}>
-            {{ .Content }}
+          <!-- 预览工具栏 -->
+          {{if .CurrentFile}}
+          <div class="preview-toolbar">
+            <button class="editor-btn editor-btn-edit">Edit</button>
+          </div>
+          {{end}}
+
+          <!-- 编辑工具栏（默认隐藏） -->
+          <div class="editor-toolbar" style="display:none">
+            <button class="editor-btn editor-btn-preview">Preview</button>
+            <button class="editor-btn editor-btn-save">Save</button>
+            <button class="editor-btn editor-btn-cancel">Cancel</button>
+          </div>
+
+          <!-- 编辑器区域（默认隐藏） -->
+          <div class="editor-container" style="display:none">
+            <textarea class="editor-textarea" aria-label="Markdown editor"></textarea>
+          </div>
+
+          <div class="preview-content">
+            <div {{if .BoundingBox }} class="container-inner" {{end}}>
+              {{ .Content }}
+            </div>
           </div>
           {{if or .PreviousArticle.Path .NextArticle.Path}}
           <nav class="docs-page-nav" aria-label="Article navigation">
