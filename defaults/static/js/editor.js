@@ -36,7 +36,7 @@
 			cancelBtn.addEventListener("click", cancelEdit);
 		}
 
-		var previewBtn = document.querySelector(".editor-btn-preview");
+		var previewBtn = document.querySelector(".editor-btn-eye");
 		if (previewBtn) {
 			previewBtn.addEventListener("click", togglePreview);
 		}
@@ -90,7 +90,7 @@
 					textarea.setSelectionRange(0, 0);
 				});
 
-				var previewBtn = document.querySelector(".editor-btn-preview");
+				var previewBtn = document.querySelector(".editor-btn-eye");
 				if (previewBtn) previewBtn.classList.add("active");
 
 				DEBOUNCE_DELAY = 150;
@@ -221,7 +221,7 @@
 		if (!isEditing) return;
 
 		var wrapper = document.querySelector(".editor-split-wrapper");
-		var previewBtn = document.querySelector(".editor-btn-preview");
+		var previewBtn = document.querySelector(".editor-btn-eye");
 		if (!wrapper) return;
 
 		var isHidden = wrapper.classList.toggle("no-preview");
@@ -276,7 +276,7 @@
 		}
 		var wrapper = document.querySelector(".editor-split-wrapper");
 		if (wrapper) wrapper.classList.remove("no-preview");
-		var previewBtn = document.querySelector(".editor-btn-preview");
+		var previewBtn = document.querySelector(".editor-btn-eye");
 		if (previewBtn) previewBtn.classList.remove("active");
 	}
 
