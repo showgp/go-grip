@@ -299,6 +299,40 @@
   color: #e6edf3;
 }
 
+/* --- Edit mode: full-height container & textarea --- */
+[data-editing="true"] .docs-main .container {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 120px);
+}
+
+[data-editing="true"] .editor-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+[data-editing="true"] .editor-textarea {
+  flex: 1;
+  min-height: 0;
+}
+
+/* --- Edit mode: hide sidebar, TOC, footer, page nav --- */
+[data-editing="true"] .docs-sidebar,
+[data-editing="true"] .docs-toc,
+[data-editing="true"] .footer,
+[data-editing="true"] .docs-page-nav {
+  display: none;
+}
+
+[data-editing="true"] .docs-shell {
+  display: block;
+}
+
+[data-editing="true"] .docs-main {
+  max-width: 100%;
+}
+
 @media print {
   .editor-toast,
   .editor-dialog-overlay {

@@ -71,6 +71,9 @@
 					isDirty = textarea.value !== originalContent;
 				};
 
+				textarea.setSelectionRange(0, 0);
+				document.documentElement.scrollTop = 0;
+
 				pollTimer = setInterval(checkExternalChanges, 5000);
 			})
 			.catch(function (err) {
