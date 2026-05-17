@@ -8,6 +8,7 @@
 	var debounceTimer = null;
 	var DEBOUNCE_DELAY = 150;
 	var LARGE_DOC_THRESHOLD = 5000;
+	var isSyncingScroll = false;
 
 	function encodePath(path) {
 		return path.split("/").map(encodeURIComponent).join("/");
@@ -82,12 +83,21 @@
 				};
 
 				textarea.setSelectionRange(0, 0);
+				textarea.scrollTop = 0;
 				document.documentElement.scrollTop = 0;
+				requestAnimationFrame(function () {
+					textarea.scrollTop = 0;
+					textarea.setSelectionRange(0, 0);
+				});
 
 				var previewBtn = document.querySelector(".editor-btn-preview");
 				if (previewBtn) previewBtn.classList.add("active");
 
 				DEBOUNCE_DELAY = 150;
+
+				var previewEl = document.querySelector(".editor-split-preview");
+				textarea.addEventListener("scroll", syncScrollFromTextarea);
+				if (previewEl) previewEl.addEventListener("scroll", syncScrollFromPreview);
 
 				var wrapper = document.querySelector(".editor-split-wrapper");
 				if (wrapper) wrapper.classList.remove("no-preview");
@@ -104,7 +114,10 @@
 		var preview = document.querySelector(".editor-split-preview");
 		var textarea = document.querySelector(".editor-textarea");
 		if (!preview || !textarea) return;
-		if (typeof marked === "undefined") return;
+		if (typeof marked === "undefined") {
+			console.warn("marked not loaded; preview cannot render");
+			return;
+		}
 
 		// XSS boundary: marked.parse() passes through raw HTML by default.
 		// Since textarea content is self-authored (local dev tool),
@@ -112,6 +125,7 @@
 		// Relative image paths resolve against the page URL, not the
 		// file directory, so they may appear broken in preview.
 		preview.innerHTML = marked.parse(textarea.value);
+		requestAnimationFrame(syncScrollFromTextarea);
 	}
 
 	function scheduleRender() {
@@ -122,6 +136,38 @@
 		debounceTimer = setTimeout(function () {
 			requestAnimationFrame(renderPreview);
 		}, delay);
+	}
+
+	function syncScrollFromTextarea() {
+		if (isSyncingScroll) return;
+		isSyncingScroll = true;
+		try {
+			var textarea = document.querySelector(".editor-textarea");
+			var preview = document.querySelector(".editor-split-preview");
+			if (textarea && preview) {
+				var th = textarea.scrollHeight - textarea.clientHeight;
+				var ph = preview.scrollHeight - preview.clientHeight;
+				preview.scrollTop = th > 0 ? (textarea.scrollTop / th) * ph : 0;
+			}
+		} finally {
+			isSyncingScroll = false;
+		}
+	}
+
+	function syncScrollFromPreview() {
+		if (isSyncingScroll) return;
+		isSyncingScroll = true;
+		try {
+			var textarea = document.querySelector(".editor-textarea");
+			var preview = document.querySelector(".editor-split-preview");
+			if (textarea && preview) {
+				var ph = preview.scrollHeight - preview.clientHeight;
+				var th = textarea.scrollHeight - textarea.clientHeight;
+				textarea.scrollTop = ph > 0 ? (preview.scrollTop / ph) * th : 0;
+			}
+		} finally {
+			isSyncingScroll = false;
+		}
 	}
 
 	function saveContent() {
@@ -221,8 +267,13 @@
 			clearTimeout(debounceTimer);
 			debounceTimer = null;
 		}
+		var textarea = document.querySelector(".editor-textarea");
+		if (textarea) textarea.removeEventListener("scroll", syncScrollFromTextarea);
 		var preview = document.querySelector(".editor-split-preview");
-		if (preview) preview.innerHTML = "";
+		if (preview) {
+			preview.removeEventListener("scroll", syncScrollFromPreview);
+			preview.innerHTML = "";
+		}
 		var wrapper = document.querySelector(".editor-split-wrapper");
 		if (wrapper) wrapper.classList.remove("no-preview");
 		var previewBtn = document.querySelector(".editor-btn-preview");
