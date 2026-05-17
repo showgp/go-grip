@@ -18,30 +18,35 @@ import (
 
 const wsVersion = "2"
 
+type client struct {
+	conn *websocket.Conn
+	mu   sync.Mutex
+}
+
 type Reloader struct {
 	rootDir   string
 	endpoint  string
-	debugLog  *log.Logger
 	errorLog  *log.Logger
 	Upgrader  websocket.Upgrader
-	clients   map[*websocket.Conn]bool
+	clients   map[*client]bool
 	clientsMu sync.RWMutex
 }
 
 func New(rootDir string) *Reloader {
-	return &Reloader{
+	r := &Reloader{
 		rootDir:  rootDir,
 		endpoint: "/reload_ws",
 		errorLog: log.New(os.Stderr, "HotReload: ", log.Lmsgprefix|log.Ltime),
 		Upgrader: websocket.Upgrader{},
-		clients:  make(map[*websocket.Conn]bool),
+		clients:  make(map[*client]bool),
 	}
+	go r.watch()
+	return r
 }
 
 func (r *Reloader) Endpoint() string { return r.endpoint }
 
 func (r *Reloader) Handle(next http.Handler) http.Handler {
-	go r.watch()
 	script := r.injectedScript()
 
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -50,30 +55,58 @@ func (r *Reloader) Handle(next http.Handler) http.Handler {
 			return
 		}
 
-		w.Header().Set("Cache-Control", "no-cache")
+		rrw := &reloadResponseWriter{header: make(http.Header)}
+		rrw.header.Set("Cache-Control", "no-cache")
+		next.ServeHTTP(rrw, req)
 
-		buf := &bytes.Buffer{}
-		sw := &sniffResponseWriter{ResponseWriter: w, buf: buf}
-		next.ServeHTTP(sw, req)
+		for k, v := range rrw.header {
+			if k == "Content-Length" {
+				continue
+			}
+			w.Header()[k] = v
+		}
 
+		body := rrw.buf.Bytes()
 		ct := w.Header().Get("Content-Type")
 		if ct == "" {
-			ct = http.DetectContentType(buf.Bytes())
+			ct = http.DetectContentType(body)
+			w.Header().Set("Content-Type", ct)
 		}
 		if strings.HasPrefix(ct, "text/html") {
-			w.Write([]byte(script))
+			scriptBytes := []byte(script)
+			if idx := bytes.LastIndex(body, []byte("</body>")); idx != -1 {
+				body = bytes.Join([][]byte{body[:idx], scriptBytes, body[idx:]}, nil)
+			} else {
+				body = append(body, scriptBytes...)
+			}
 		}
+		w.WriteHeader(rrw.code)
+		w.Write(body)
 	})
 }
 
-type sniffResponseWriter struct {
-	http.ResponseWriter
-	buf *bytes.Buffer
+type reloadResponseWriter struct {
+	buf         bytes.Buffer
+	header      http.Header
+	code        int
+	wroteHeader bool
 }
 
-func (w *sniffResponseWriter) Write(b []byte) (int, error) {
-	w.buf.Write(b)
-	return w.ResponseWriter.Write(b)
+func (w *reloadResponseWriter) Header() http.Header { return w.header }
+
+func (w *reloadResponseWriter) WriteHeader(code int) {
+	if w.wroteHeader {
+		return
+	}
+	w.wroteHeader = true
+	w.code = code
+}
+
+func (w *reloadResponseWriter) Write(b []byte) (int, error) {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.buf.Write(b)
 }
 
 func (r *Reloader) watch() {
@@ -96,7 +129,8 @@ func (r *Reloader) watch() {
 
 	err = filepath.WalkDir(absRoot, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
-			return err
+			r.errorLog.Printf("walk error at %s: %s\n", path, err)
+			return nil
 		}
 		if d.IsDir() {
 			return watcher.Add(path)
@@ -108,17 +142,35 @@ func (r *Reloader) watch() {
 		return
 	}
 
-	deb := debounce.New(100 * time.Millisecond)
+	deb := newDebouncer()
 
 	for {
 		select {
-		case err := <-watcher.Errors:
+		case err, ok := <-watcher.Errors:
+			if !ok {
+				return
+			}
 			r.errorLog.Printf("watch error: %s\n", err)
-		case e := <-watcher.Events:
+		case e, ok := <-watcher.Events:
+			if !ok {
+				return
+			}
 			switch {
 			case e.Has(fsnotify.Create):
-				dir := filepath.Dir(e.Name)
-				_ = watcher.Add(dir)
+				fi, fiErr := os.Stat(e.Name)
+				if fiErr == nil && fi.IsDir() {
+					filepath.WalkDir(e.Name, func(path string, d os.DirEntry, walkErr error) error {
+						if walkErr != nil {
+							return nil
+						}
+						if d.IsDir() {
+							watcher.Add(path)
+						}
+						return nil
+					})
+				} else {
+					watcher.Add(e.Name)
+				}
 				r.handleEvent(e.Name, deb)
 			case e.Has(fsnotify.Write):
 				r.handleEvent(e.Name, deb)
@@ -129,7 +181,29 @@ func (r *Reloader) watch() {
 	}
 }
 
-func (r *Reloader) handleEvent(name string, deb func(func())) {
+type debouncer struct {
+	mu  sync.Mutex
+	deb map[string]func(func())
+}
+
+func newDebouncer() *debouncer {
+	return &debouncer{
+		deb: make(map[string]func(func())),
+	}
+}
+
+func (d *debouncer) call(key string, fn func()) {
+	d.mu.Lock()
+	f, ok := d.deb[key]
+	if !ok {
+		f = debounce.New(100 * time.Millisecond)
+		d.deb[key] = f
+	}
+	d.mu.Unlock()
+	f(fn)
+}
+
+func (r *Reloader) handleEvent(name string, deb *debouncer) {
 	if !strings.HasSuffix(strings.ToLower(name), ".md") {
 		return
 	}
@@ -138,28 +212,39 @@ func (r *Reloader) handleEvent(name string, deb func(func())) {
 		return
 	}
 	msg := fmt.Sprintf("reload:%s", filepath.ToSlash(rel))
-	deb(func() {
+	deb.call(name, func() {
 		r.broadcast(msg)
 	})
 }
 
 func (r *Reloader) broadcast(msg string) {
 	r.clientsMu.RLock()
-	defer r.clientsMu.RUnlock()
-	for conn := range r.clients {
-		err := conn.WriteMessage(websocket.TextMessage, []byte(msg))
+	dead := make([]*client, 0)
+	for cl := range r.clients {
+		cl.mu.Lock()
+		err := cl.conn.WriteMessage(websocket.TextMessage, []byte(msg))
+		cl.mu.Unlock()
 		if err != nil {
 			r.errorLog.Printf("write error: %s\n", err)
-			conn.Close()
-			delete(r.clients, conn)
+			cl.conn.Close()
+			dead = append(dead, cl)
 		}
+	}
+	r.clientsMu.RUnlock()
+
+	if len(dead) > 0 {
+		r.clientsMu.Lock()
+		for _, cl := range dead {
+			delete(r.clients, cl)
+		}
+		r.clientsMu.Unlock()
 	}
 }
 
 func (r *Reloader) serveWS(w http.ResponseWriter, req *http.Request) {
 	version := req.URL.Query().Get("v")
 	if version != wsVersion {
-		r.errorLog.Printf("script version mismatch: v%s vs v%s\n", version, wsVersion)
+		r.errorLog.Printf("warning: script version mismatch: client v%s != server v%s\n", version, wsVersion)
 	}
 
 	conn, err := r.Upgrader.Upgrade(w, req, nil)
@@ -168,16 +253,19 @@ func (r *Reloader) serveWS(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	cl := &client{conn: conn}
 	r.clientsMu.Lock()
-	r.clients[conn] = true
+	r.clients[cl] = true
 	r.clientsMu.Unlock()
 
+	conn.SetReadDeadline(time.Now().Add(1 * time.Minute))
 	_, _, err = conn.ReadMessage()
 	if err != nil {
-		// client disconnected
+		// client disconnected or read deadline exceeded
 	}
+
 	r.clientsMu.Lock()
-	delete(r.clients, conn)
+	delete(r.clients, cl)
 	r.clientsMu.Unlock()
 	conn.Close()
 }
@@ -185,14 +273,17 @@ func (r *Reloader) serveWS(w http.ResponseWriter, req *http.Request) {
 func (r *Reloader) injectedScript() string {
 	return fmt.Sprintf(`
 <script>
+var retryDelay = 1000
 function retry() {
-  setTimeout(function(){ listen(true) }, 1000)
+  setTimeout(function(){ listen(true) }, retryDelay)
+  retryDelay = Math.min(retryDelay * 2, 30000)
 }
 function listen(isRetry) {
   var protocol = location.protocol === "https:" ? "wss://" : "ws://"
   var ws = new WebSocket(protocol + location.host + "%s?v=%s")
-  if(isRetry) {
-    ws.onopen = function(){ window.location.reload() }
+  ws.onopen = function() {
+    retryDelay = 1000
+    if(isRetry && document.body.getAttribute("data-editing") !== "true") { window.location.reload() }
   }
   ws.onmessage = function(msg) {
     if(msg.data.startsWith("reload:")) {

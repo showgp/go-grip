@@ -72,10 +72,12 @@
 				isDirty = false;
 				document.body.setAttribute("data-editing", "true");
 				toggleUI(true);
+				updateDoneBtnLabel();
 				textarea.focus();
 
 				textarea.oninput = function () {
 					isDirty = textarea.value !== originalContent;
+					updateDoneBtnLabel();
 					scheduleRender();
 				};
 
@@ -142,31 +144,30 @@
 				return resp.json();
 			})
 			.then(function () {
+				saveBtn.disabled = false;
+				saveBtn.textContent = "Save";
 				originalContent = content;
 				isDirty = false;
+				updateDoneBtnLabel();
 				saveSidebarState();
 				showToast("Saved", "success");
-				fetch("/api/raw/" + encodePath(currentFile))
-					.then(function(resp) { return resp.text(); })
-					.then(function(raw) {
-						if (typeof marked !== "undefined") {
-							var rendered = marked.parse(raw);
-							var previewContent = document.querySelector(".preview-content");
-							if (previewContent) {
-								previewContent.innerHTML = rendered;
-							}
-							var splitPreview = document.querySelector(".editor-split-preview");
-							if (splitPreview) {
-								splitPreview.innerHTML = rendered;
-							}
-						}
-					})
-					.catch(function() {});
+				if (typeof marked !== "undefined") {
+					var rendered = marked.parse(content);
+					var previewContent = document.querySelector(".preview-content");
+					if (previewContent) {
+						previewContent.innerHTML = rendered;
+					}
+					var splitPreview = document.querySelector(".editor-split-preview");
+					if (splitPreview) {
+						splitPreview.innerHTML = rendered;
+					}
+				}
 			})
 			.catch(function (err) {
 				saveBtn.disabled = false;
 				saveBtn.textContent = "Save";
 				showToast(err.message, "error");
+				console.error("Save failed:", err);
 			});
 	}
 
@@ -186,6 +187,12 @@
 		if (previewBtn) {
 			previewBtn.classList.toggle("active", !isHidden);
 		}
+	}
+
+	function updateDoneBtnLabel() {
+		var doneBtn = document.querySelector(".editor-btn-cancel");
+		if (!doneBtn) return;
+		doneBtn.textContent = isDirty ? "Cancel" : "Done";
 	}
 
 	function cancelEdit() {
@@ -236,13 +243,15 @@
 			})
 			.then(function (text) {
 				if (text === originalContent) return;
-				if (confirm("This file has been modified externally. Overwrite with your changes or reload the latest version?")) {
-					originalContent = text;
-				} else {
+				if (confirm("This file has been modified externally. Discard your changes and reload the latest version?")) {
 					var textarea = document.querySelector(".editor-textarea");
 					textarea.value = text;
 					originalContent = text;
 					isDirty = false;
+					updateDoneBtnLabel();
+					renderPreview();
+				} else {
+					originalContent = text;
 				}
 			})
 			.catch(function () {});
@@ -262,11 +271,30 @@
 
 	function handleExternalReload(e) {
 		var changedFile = e.detail.file;
-		if (changedFile === currentFile) {
-			showToast("Saved", "success");
-		} else {
+		if (changedFile !== currentFile) {
 			showToast("File updated: " + changedFile, "success");
+			return;
 		}
+		if (!isEditing) return;
+		fetch("/api/raw/" + encodePath(currentFile))
+			.then(function (resp) {
+				if (!resp.ok) throw new Error("Failed to fetch");
+				return resp.text();
+			})
+			.then(function (text) {
+				if (text === originalContent) return;
+				if (isDirty && !confirm("This file has been modified externally. Discard your changes and reload?")) {
+					return;
+				}
+				var textarea = document.querySelector(".editor-textarea");
+				textarea.value = text;
+				originalContent = text;
+				isDirty = false;
+				updateDoneBtnLabel();
+				renderPreview();
+				showToast("Reloaded latest version", "success");
+			})
+			.catch(function () {});
 	}
 
 	function handleKeydown(e) {
