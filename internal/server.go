@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -15,7 +14,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/aarol/reload"
+	"github.com/showgp/go-grip/internal/hotreload"
 	chroma_html "github.com/alecthomas/chroma/v2/formatters/html"
 	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/showgp/go-grip/defaults"
@@ -80,11 +79,9 @@ func (s *Server) Serve(file string) error {
 		return err
 	}
 
-	var reloadMiddleware *reload.Reloader
+	var reloadMiddleware *hotreload.Reloader
 	if s.enableReload {
-		reloadMiddleware = reload.New(target.rootDir)
-		reloadMiddleware.DebugLog = log.New(io.Discard, "", 0)
-		// Fix WebSocket CORS issues for development
+		reloadMiddleware = hotreload.New(filepath.Clean(target.rootDir))
 		reloadMiddleware.Upgrader.CheckOrigin = func(r *http.Request) bool {
 			return true
 		}
@@ -94,7 +91,7 @@ func (s *Server) Serve(file string) error {
 
 	if s.enableReload {
 		handler = reloadMiddleware.Handle(handler)
-		fmt.Printf("📡 Auto-reload enabled. Files will trigger browser refresh.\n")
+		fmt.Printf("📡 Auto-reload enabled. Only .md files will trigger browser refresh.\n")
 	} else {
 		fmt.Printf("🔄 Auto-reload disabled. Use F5 to manually refresh.\n")
 	}

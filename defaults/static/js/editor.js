@@ -4,6 +4,7 @@
 	var isEditing = false;
 	var isDirty = false;
 	var pollTimer = null;
+	var reloadChangedHandler = null;
 	var debounceTimer = null;
 	var DEBOUNCE_DELAY = 150;
 	var LARGE_DOC_THRESHOLD = 5000;
@@ -48,6 +49,9 @@
 		});
 
 		interceptSidebarLinks();
+
+		reloadChangedHandler = handleExternalReload;
+		window.addEventListener("reload-changed", reloadChangedHandler);
 
 		restoreScrollPosition();
 	}
@@ -141,12 +145,23 @@
 				originalContent = content;
 				isDirty = false;
 				saveSidebarState();
-				sessionStorage.setItem("go-grip-scrollTop", document.documentElement.scrollTop.toString());
-				sessionStorage.setItem("go-grip-editor-saved", "true");
 				showToast("Saved", "success");
-				setTimeout(function () {
-					window.location.reload();
-				}, 600);
+				fetch("/api/raw/" + encodePath(currentFile))
+					.then(function(resp) { return resp.text(); })
+					.then(function(raw) {
+						if (typeof marked !== "undefined") {
+							var rendered = marked.parse(raw);
+							var previewContent = document.querySelector(".preview-content");
+							if (previewContent) {
+								previewContent.innerHTML = rendered;
+							}
+							var splitPreview = document.querySelector(".editor-split-preview");
+							if (splitPreview) {
+								splitPreview.innerHTML = rendered;
+							}
+						}
+					})
+					.catch(function() {});
 			})
 			.catch(function (err) {
 				saveBtn.disabled = false;
@@ -190,6 +205,10 @@
 		if (pollTimer) {
 			clearInterval(pollTimer);
 			pollTimer = null;
+		}
+		if (reloadChangedHandler) {
+			window.removeEventListener("reload-changed", reloadChangedHandler);
+			reloadChangedHandler = null;
 		}
 		if (debounceTimer) {
 			clearTimeout(debounceTimer);
@@ -239,6 +258,15 @@
 		if (editorToolbar) editorToolbar.style.display = editMode ? "" : "none";
 		if (editorContainer) editorContainer.style.display = editMode ? "" : "none";
 		if (previewContent) previewContent.style.display = editMode ? "none" : "";
+	}
+
+	function handleExternalReload(e) {
+		var changedFile = e.detail.file;
+		if (changedFile === currentFile) {
+			showToast("Saved", "success");
+		} else {
+			showToast("File updated: " + changedFile, "success");
+		}
 	}
 
 	function handleKeydown(e) {
@@ -399,7 +427,6 @@
 			}
 			sessionStorage.removeItem("go-grip-scrollTop");
 		}
-		sessionStorage.removeItem("go-grip-editor-saved");
 	}
 
 	init();

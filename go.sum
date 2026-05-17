@@ -1,5 +1,3 @@
-github.com/aarol/reload v1.2.0 h1:zJZuWREX+rrB5V8o/PfQn1y9bG3rG8vmE0NeJl8aep0=
-github.com/aarol/reload v1.2.0/go.mod h1:3XL4gixCRx2VRXr4l3/qemjo2oWq8WxDRetd+EUkBcg=
 github.com/alecthomas/assert/v2 v2.7.0 h1:QtqSACNS3tF7oasA8CU6A6sXZSBDqnm7RfpLl9bZqbE=
 github.com/alecthomas/assert/v2 v2.7.0/go.mod h1:Bze95FyfUr7x34QZrjL+XP+0qgp/zg8yS+TtBj1WA3k=
 github.com/alecthomas/chroma/v2 v2.14.0 h1:R3+wzpnUArGcQz7fCETQBzO5n9IMNi13iIs46aU4V9E=
