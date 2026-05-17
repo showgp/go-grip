@@ -70,6 +70,14 @@ Additional server behavior:
 - If a port is explicitly set with `-p`, go-grip treats that port as strict and reports an error when it is unavailable.
 - `--no-reload` disables automatic browser reload on file changes.
 
+Additional editor support:
+
+- In-browser Markdown editing with save-to-disk: click the Edit button on any Markdown page to open a split-screen editor.
+- Split-screen live preview renders the compiled Markdown in real time as you type (powered by [marked.js](https://marked.js.org/)).
+- Scroll synchronization keeps the editor textarea and preview panel aligned by scroll percentage.
+- Custom `.md`-only file watcher (replaces `aarol/reload`) with WebSocket-based hot reload, exponential backoff reconnection, and debounced change events.
+- Keyboard shortcuts: `Ctrl+S` saves and reloads the browser, `Ctrl+Enter` saves and stays in the editor, `Ctrl+P` toggles the preview panel.
+
 Distribution changes:
 
 - This fork uses the module path `github.com/showgp/go-grip`.
@@ -97,6 +105,15 @@ Distribution changes:
 - math expressions (code, inline, block)
 - gh issues and prs #46 and grafana/grafana#22
 - toggle state is preserved in [sessionStorage](https://developer.mozilla.org/en-US/docs/Web/API/Window/sessionStorage)
+- In-browser Markdown editing with save-to-disk (Edit/Save/Cancel workflow)
+- Split-screen live preview with real-time Markdown rendering
+- Scroll synchronization between editor and preview panels
+- Custom polling detects external file changes while editing, with prompt to reload or keep edits
+- `Ctrl+S` save-and-reload, `Ctrl+Enter` save-and-stay, `Ctrl+P` toggle preview
+- Draggable split divider to resize editor/preview panels (persisted in sessionStorage)
+- Preview panel toggle button for distraction-free editing
+- Custom `.md`-only file watcher with WebSocket hot-reload and exponential backoff reconnection
+- Debounced rendering (150ms default, scales to 300ms for 5000+ line documents)
 - automatic fallback to the next available port when the default port is busy
 - strict explicit port handling with `-p`
 - optional automatic browser reload control with `--no-reload`
@@ -240,6 +257,30 @@ go-grip --no-reload README.md
 ```
 
 To terminate the current server simply press `CTRL-C`.
+
+### Editor mode
+
+When viewing a Markdown file, click the **Edit** button in the toolbar to open the built-in editor. The page switches to a split-screen layout: a textarea on the left for Markdown source and a live preview on the right.
+
+Use the toolbar buttons to:
+
+- **Save** — writes the content to disk and refreshes the browser preview.
+- **Cancel** / **Done** — exits edit mode; shows "Cancel" when there are unsaved changes and "Done" when the content matches the saved file.
+- **Preview** — toggles the preview panel on/off for distraction-free editing.
+- The split divider between editor and preview is draggable; the position is remembered across sessions.
+
+Keyboard shortcuts while editing:
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+S` | Save and reload the browser |
+| `Ctrl+Enter` | Save and stay in the editor |
+| `Ctrl+P` | Toggle preview panel |
+| `Esc` | Exit edit mode (same as Cancel/Done) |
+
+If the Markdown file changes on disk while the editor is open (e.g., by another program or `git pull`), go-grip detects the change and shows a dialog: **OK** reloads the latest content into the editor, **Cancel** keeps your edits and suppresses further prompts until the next save.
+
+The browser will reload automatically when a `.md` file changes on disk, unless `--no-reload` is used.
 
 ## :pencil: Examples
 
