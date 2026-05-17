@@ -110,6 +110,18 @@
     border-color: #58a6ff;
     box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
   }
+
+  [data-editing="true"] .editor-split-preview {
+    background: #0d1117;
+    color: #e6edf3;
+    border-color: #30363d;
+  }
+
+  [data-editing="true"] .editor-btn-preview.active {
+    background-color: #0c2d6b;
+    border-color: #58a6ff;
+    color: #58a6ff;
+  }
 }
 
 [data-theme="dark"] .editor-btn {
@@ -151,6 +163,18 @@
   box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
 }
 
+[data-theme="dark"] .editor-split-preview {
+  background: #0d1117;
+  color: #e6edf3;
+  border-color: #30363d;
+}
+
+[data-theme="dark"] .editor-btn-preview.active {
+  background-color: #0c2d6b;
+  border-color: #58a6ff;
+  color: #58a6ff;
+}
+
 [data-theme="light"] .editor-btn {
   color: #24292f;
   background-color: #f6f8fa;
@@ -188,6 +212,18 @@
 [data-theme="light"] .editor-textarea:focus {
   border-color: #0969da;
   box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.15);
+}
+
+[data-theme="light"] .editor-split-preview {
+  background: #ffffff;
+  color: #1f2328;
+  border-color: #d0d7de;
+}
+
+[data-theme="light"] .editor-btn-preview.active {
+  background-color: #ddf4ff;
+  border-color: #54aeff;
+  color: #0969da;
 }
 
 @media (min-width: 768px) and (max-width: 1023px) {
@@ -315,6 +351,82 @@
 [data-editing="true"] .editor-textarea {
   flex: 1;
   min-height: 0;
+}
+
+/* --- Split-screen preview layout --- */
+[data-editing="true"] .editor-split-wrapper {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  min-height: 0;
+}
+
+[data-editing="true"] .editor-split-wrapper .editor-textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  resize: none;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+[data-editing="true"] .editor-split-preview {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: auto !important;
+  padding: 16px;
+  border: 1px solid #d0d7de;
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  background: #ffffff;
+  color: #1f2328;
+  word-wrap: break-word;
+  pointer-events: none;
+}
+
+[data-editing="true"] .editor-split-preview a {
+  pointer-events: none;
+  color: inherit;
+  text-decoration: underline;
+}
+
+[data-editing="true"] .editor-split-wrapper.no-preview .editor-split-preview {
+  display: none;
+}
+
+[data-editing="true"] .editor-split-wrapper.no-preview .editor-textarea {
+  resize: vertical;
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+[data-editing="true"] .editor-btn-preview.active {
+  background-color: #ddf4ff;
+  border-color: #54aeff;
+  color: #0969da;
+}
+
+@media (max-width: 767px) {
+  [data-editing="true"] .editor-split-wrapper {
+    flex-direction: column;
+  }
+
+  [data-editing="true"] .editor-split-wrapper .editor-textarea {
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 0;
+    border-bottom-left-radius: 0;
+    resize: vertical;
+  }
+
+  [data-editing="true"] .editor-split-preview {
+    border-left: 1px solid;
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    min-height: 200px;
+    max-height: 50vh;
+  }
 }
 
 /* --- Edit mode: hide sidebar, TOC, footer, page nav --- */

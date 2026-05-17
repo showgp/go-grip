@@ -4,6 +4,9 @@
 	var isEditing = false;
 	var isDirty = false;
 	var pollTimer = null;
+	var debounceTimer = null;
+	var DEBOUNCE_DELAY = 150;
+	var LARGE_DOC_THRESHOLD = 5000;
 
 	function encodePath(path) {
 		return path.split("/").map(encodeURIComponent).join("/");
@@ -33,7 +36,7 @@
 
 		var previewBtn = document.querySelector(".editor-btn-preview");
 		if (previewBtn) {
-			previewBtn.addEventListener("click", cancelEdit);
+			previewBtn.addEventListener("click", togglePreview);
 		}
 
 		document.addEventListener("keydown", handleKeydown);
@@ -69,16 +72,50 @@
 
 				textarea.oninput = function () {
 					isDirty = textarea.value !== originalContent;
+					scheduleRender();
 				};
 
 				textarea.setSelectionRange(0, 0);
 				document.documentElement.scrollTop = 0;
+
+				var previewBtn = document.querySelector(".editor-btn-preview");
+				if (previewBtn) previewBtn.classList.add("active");
+
+				DEBOUNCE_DELAY = 150;
+
+				var wrapper = document.querySelector(".editor-split-wrapper");
+				if (wrapper) wrapper.classList.remove("no-preview");
+				renderPreview();
 
 				pollTimer = setInterval(checkExternalChanges, 5000);
 			})
 			.catch(function (err) {
 				alert("Failed to load file: " + err.message);
 			});
+	}
+
+	function renderPreview() {
+		var preview = document.querySelector(".editor-split-preview");
+		var textarea = document.querySelector(".editor-textarea");
+		if (!preview || !textarea) return;
+		if (typeof marked === "undefined") return;
+
+		// XSS boundary: marked.parse() passes through raw HTML by default.
+		// Since textarea content is self-authored (local dev tool),
+		// this is an acceptable self-XSS boundary.
+		// Relative image paths resolve against the page URL, not the
+		// file directory, so they may appear broken in preview.
+		preview.innerHTML = marked.parse(textarea.value);
+	}
+
+	function scheduleRender() {
+		clearTimeout(debounceTimer);
+		var textarea = document.querySelector(".editor-textarea");
+		var lines = textarea ? textarea.value.split("\n").length : 0;
+		var delay = lines > LARGE_DOC_THRESHOLD ? 300 : DEBOUNCE_DELAY;
+		debounceTimer = setTimeout(function () {
+			requestAnimationFrame(renderPreview);
+		}, delay);
 	}
 
 	function saveContent() {
@@ -118,6 +155,24 @@
 			});
 	}
 
+	function togglePreview() {
+		if (!isEditing) return;
+
+		var wrapper = document.querySelector(".editor-split-wrapper");
+		var previewBtn = document.querySelector(".editor-btn-preview");
+		if (!wrapper) return;
+
+		var isHidden = wrapper.classList.toggle("no-preview");
+
+		if (!isHidden) {
+			renderPreview();
+		}
+
+		if (previewBtn) {
+			previewBtn.classList.toggle("active", !isHidden);
+		}
+	}
+
 	function cancelEdit() {
 		if (isDirty) {
 			if (!confirm("You have unsaved changes. Discard them?")) {
@@ -136,6 +191,16 @@
 			clearInterval(pollTimer);
 			pollTimer = null;
 		}
+		if (debounceTimer) {
+			clearTimeout(debounceTimer);
+			debounceTimer = null;
+		}
+		var preview = document.querySelector(".editor-split-preview");
+		if (preview) preview.innerHTML = "";
+		var wrapper = document.querySelector(".editor-split-wrapper");
+		if (wrapper) wrapper.classList.remove("no-preview");
+		var previewBtn = document.querySelector(".editor-btn-preview");
+		if (previewBtn) previewBtn.classList.remove("active");
 	}
 
 	function checkExternalChanges() {

@@ -59,6 +59,7 @@
     <script src="/static/js/toc-active.js"></script>
     <script src="/static/js/sidebar-active.js"></script>
     <script src="/static/js/article-nav.js"></script>
+    <script src="/static/js/marked.min.js" defer></script>
     <script src="/static/js/editor.js" defer></script>
   </head>
 
@@ -98,7 +99,10 @@
 
           <!-- 编辑器区域（默认隐藏） -->
           <div class="editor-container" style="display:none">
-            <textarea class="editor-textarea" aria-label="Markdown editor"></textarea>
+            <div class="editor-split-wrapper">
+              <textarea class="editor-textarea" aria-label="Markdown editor"></textarea>
+              <div class="editor-split-preview" aria-label="Live Markdown preview"></div>
+            </div>
           </div>
 
           <div class="preview-content">
