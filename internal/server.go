@@ -318,7 +318,7 @@ func (s *Server) handleRaw(dir http.Dir) http.HandlerFunc {
 
 		setNoCacheHeaders(w)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Write(content)
+		_, _ = w.Write(content)
 	}
 }
 
@@ -362,7 +362,7 @@ func writeToDir(absPath string, data []byte) error {
 
 	tmpFile := absPath + ".tmp"
 	if err := os.WriteFile(tmpFile, data, 0644); err != nil {
-		os.Remove(tmpFile)
+		_ = os.Remove(tmpFile)
 		return err
 	}
 	return os.Rename(tmpFile, absPath)
@@ -376,14 +376,14 @@ func checkWritable(absPath string) error {
 		}
 		return fmt.Errorf("cannot open file for writing")
 	}
-	f.Close()
+	_ = f.Close()
 	return nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, data map[string]string) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(data)
+	_ = json.NewEncoder(w).Encode(data)
 }
 
 type htmlStruct struct {

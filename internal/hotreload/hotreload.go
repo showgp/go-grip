@@ -81,7 +81,7 @@ func (r *Reloader) Handle(next http.Handler) http.Handler {
 			}
 		}
 		w.WriteHeader(rrw.code)
-		w.Write(body)
+		_, _ = w.Write(body)
 	})
 }
 
@@ -115,7 +115,7 @@ func (r *Reloader) watch() {
 		r.errorLog.Printf("fsnotify error: %s\n", err)
 		return
 	}
-	defer watcher.Close()
+	defer func() { _ = watcher.Close() }()
 
 	absRoot := r.rootDir
 	if !filepath.IsAbs(absRoot) {
@@ -159,23 +159,23 @@ func (r *Reloader) watch() {
 			case e.Has(fsnotify.Create):
 				fi, fiErr := os.Stat(e.Name)
 				if fiErr == nil && fi.IsDir() {
-					filepath.WalkDir(e.Name, func(path string, d os.DirEntry, walkErr error) error {
+					_ = filepath.WalkDir(e.Name, func(path string, d os.DirEntry, walkErr error) error {
 						if walkErr != nil {
 							return nil
 						}
 						if d.IsDir() {
-							watcher.Add(path)
+							_ = watcher.Add(path)
 						}
 						return nil
 					})
 				} else {
-					watcher.Add(e.Name)
+					_ = watcher.Add(e.Name)
 				}
 				r.handleEvent(e.Name, deb)
 			case e.Has(fsnotify.Write):
 				r.handleEvent(e.Name, deb)
 			case e.Has(fsnotify.Rename), e.Has(fsnotify.Remove):
-				watcher.Remove(e.Name)
+				_ = watcher.Remove(e.Name)
 			}
 		}
 	}
@@ -226,7 +226,7 @@ func (r *Reloader) broadcast(msg string) {
 		cl.mu.Unlock()
 		if err != nil {
 			r.errorLog.Printf("write error: %s\n", err)
-			cl.conn.Close()
+			_ = cl.conn.Close()
 			dead = append(dead, cl)
 		}
 	}
@@ -258,16 +258,16 @@ func (r *Reloader) serveWS(w http.ResponseWriter, req *http.Request) {
 	r.clients[cl] = true
 	r.clientsMu.Unlock()
 
-	conn.SetReadDeadline(time.Now().Add(1 * time.Minute))
+	_ = conn.SetReadDeadline(time.Now().Add(1 * time.Minute))
 	_, _, err = conn.ReadMessage()
 	if err != nil {
-		// client disconnected or read deadline exceeded
+		r.errorLog.Printf("read error: %s\n", err)
 	}
 
 	r.clientsMu.Lock()
 	delete(r.clients, cl)
 	r.clientsMu.Unlock()
-	conn.Close()
+	_ = conn.Close()
 }
 
 func (r *Reloader) injectedScript() string {
