@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+	"path/filepath"
 
 	"github.com/showgp/go-grip/internal"
 	"github.com/spf13/cobra"
@@ -29,7 +30,21 @@ var rootCmd = &cobra.Command{
 				return fmt.Errorf("render %q: %w", exportFile, err)
 			}
 
-			htmlContent, err := internal.BuildExportHTML(template.HTML(rendered.Content), false)
+			// Use the export file's directory as root for image resolution
+			exportDir := filepath.Dir(exportFile)
+			if exportDir == "." {
+				absDir, err := filepath.Abs(".")
+				if err == nil {
+					exportDir = absDir
+				}
+			} else {
+				absDir, err := filepath.Abs(exportDir)
+				if err == nil {
+					exportDir = absDir
+				}
+			}
+
+			htmlContent, err := internal.BuildExportHTML(template.HTML(rendered.Content), false, exportDir)
 			if err != nil {
 				return fmt.Errorf("build export HTML: %w", err)
 			}

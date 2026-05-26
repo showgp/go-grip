@@ -280,7 +280,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	htmlContent, err := BuildExportHTML(template.HTML(rendered.Content), true)
+	htmlContent, err := BuildExportHTML(template.HTML(rendered.Content), true, s.rootDir)
 	if err != nil {
 		http.Error(w, "export error: "+err.Error(), http.StatusInternalServerError)
 		return
