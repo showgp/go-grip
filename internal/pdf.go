@@ -30,7 +30,17 @@ type PDFData struct {
 // via headless Chrome. It inlines only the CSS relevant to print output:
 // light-theme content CSS, stripped print CSS (without the @media print wrapper),
 // and Chroma light syntax highlighting.
-func buildPDFMarkup(content template.HTML) (string, error) {
+func buildPDFMarkup(content template.HTML, rootDir string) (string, error) {
+	htmlContent := string(content)
+	if rootDir != "" {
+		embedded, err := embedLocalImages(htmlContent, rootDir)
+		if err != nil {
+			return "", fmt.Errorf("embed images: %w", err)
+		}
+		htmlContent = embedded
+	}
+	content = template.HTML(htmlContent)
+
 	cssLight, err := readCSS("static/css/github-markdown-light.css")
 	if err != nil {
 		return "", fmt.Errorf("read light css: %w", err)

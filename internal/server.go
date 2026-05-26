@@ -328,7 +328,7 @@ func (s *Server) handlePDF(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build PDF-optimized HTML
-	htmlContent, err := buildPDFMarkup(template.HTML(rendered.Content))
+	htmlContent, err := buildPDFMarkup(template.HTML(rendered.Content), s.rootDir)
 	if err != nil {
 		http.Error(w, "PDF markup error: "+err.Error(), http.StatusInternalServerError)
 		return

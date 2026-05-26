@@ -134,7 +134,7 @@ func TestBuildPDFMarkup_ContainsExpectedElements(t *testing.T) {
 	t.Parallel()
 
 	content := template.HTML("<h1>PDF Test</h1><p>Content</p>")
-	result, err := buildPDFMarkup(content)
+	result, err := buildPDFMarkup(content, "")
 	if err != nil {
 		t.Fatalf("buildPDFMarkup returned error: %v", err)
 	}

@@ -236,7 +236,7 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = currentPath.split('/').pop().replace(/\.md$/i, '.html');
+        a.download = currentPath.split('/').pop().replace(/\.md$/i, '.pdf');
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
