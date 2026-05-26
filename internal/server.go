@@ -34,6 +34,9 @@ type Server struct {
 	strictPort   bool
 	recursive    bool
 	rootDir      string
+	pdfGenOnce   sync.Once
+	pdfGen       *PDFGenerator
+	pdfGenErr    error
 }
 
 type ServerOptions struct {
@@ -139,6 +142,7 @@ func (s *Server) newHandlerForTarget(target serveTarget) http.Handler {
 	mux.HandleFunc("/api/edit/", s.handleSave(dir))
 	mux.HandleFunc("/api/raw/", s.handleRaw(dir))
 	mux.HandleFunc("/export", s.handleExport)
+	mux.HandleFunc("/pdf", s.handlePDF)
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		requestFile := cleanRequestPath(r.URL.Path)
@@ -291,6 +295,65 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, outName))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(htmlContent))
+}
+
+func (s *Server) handlePDF(w http.ResponseWriter, r *http.Request) {
+	fileParam := r.URL.Query().Get("file")
+	if fileParam == "" {
+		http.Error(w, "missing file parameter", http.StatusBadRequest)
+		return
+	}
+
+	if strings.Contains(fileParam, "..") {
+		http.Error(w, "invalid file path", http.StatusBadRequest)
+		return
+	}
+	cleaned := path.Clean("/" + fileParam)[1:]
+	if cleaned == "" || strings.HasPrefix(cleaned, "/") || strings.Contains(cleaned, "..") {
+		http.Error(w, "invalid file path", http.StatusBadRequest)
+		return
+	}
+
+	dir := http.Dir(s.rootDir)
+	bytes, err := readToString(dir, cleaned)
+	if err != nil {
+		http.Error(w, "file not found: "+fileParam, http.StatusNotFound)
+		return
+	}
+
+	rendered, err := s.parser.Render(bytes)
+	if err != nil {
+		http.Error(w, "render error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Build PDF-optimized HTML
+	htmlContent, err := buildPDFMarkup(template.HTML(rendered.Content))
+	if err != nil {
+		http.Error(w, "PDF markup error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Lazy-init PDF generator
+	s.pdfGenOnce.Do(func() {
+		s.pdfGen, s.pdfGenErr = NewPDFGenerator(2)
+	})
+	if s.pdfGenErr != nil {
+		http.Error(w, "PDF generator: "+s.pdfGenErr.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	pdfBuf, err := s.pdfGen.GeneratePDF(htmlContent)
+	if err != nil {
+		http.Error(w, "PDF generation error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	outName := ExportFilename(fileParam)
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, strings.Replace(outName, ".html", ".pdf", 1)))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(pdfBuf)
 }
 
 func readToString(dir http.Dir, filename string) ([]byte, error) {

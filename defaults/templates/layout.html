@@ -126,6 +126,12 @@
               </svg>
               Export HTML
             </button>
+            <button id="export-pdf" class="docs-export-btn" title="Export as PDF">
+              <svg aria-hidden="true" viewBox="0 0 16 16" fill="currentColor" width="14" height="14">
+                <path d="M2.75 2h10.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.06.66l-5.19.52v.04c.31.22.55.51.69.86.16.4.21.82.16 1.22-.02.1-.05.18-.08.26.18.1.36.18.54.26.42.17.78.39.97.62.27.32.19.72.07.99-.13.29-.4.65-.92.84-.48.17-1.06.17-1.82.02l-.41.53a.75.75 0 0 1-.54.26c-.2 0-.4-.08-.55-.22l-2-1.75a.75.75 0 0 1-.22-.57v-.4c0-1.08.65-1.78 1.22-2.19.25-.18.49-.32.72-.43.6-.3 1.12-.48 1.47-.66l-3.46-.92A.75.75 0 0 1 2 4.25v-1.5c0-.41.34-.75.75-.75Zm.75 1.5v-2H.75v2h3.25Zm6.25-1.87a.748.748 0 0 0-1.5 0v2.2l1.5-.15V1.63Z"/>
+              </svg>
+              Export PDF
+            </button>
           </div>
           {{end}}
 
@@ -206,6 +212,25 @@
       if (!currentPath.endsWith('.md')) return;
       try {
         const resp = await fetch('/export?file=' + encodeURIComponent(currentPath.replace(/^\//, '')));
+        if (!resp.ok) throw new Error(await resp.text());
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = currentPath.split('/').pop().replace(/\.md$/i, '.html');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        alert('Export failed: ' + e.message);
+      }
+    });
+    document.getElementById('export-pdf')?.addEventListener('click', async function() {
+      const currentPath = window.location.pathname;
+      if (!currentPath.endsWith('.md')) return;
+      try {
+        const resp = await fetch('/pdf?file=' + encodeURIComponent(currentPath.replace(/^\//, '')));
         if (!resp.ok) throw new Error(await resp.text());
         const blob = await resp.blob();
         const url = URL.createObjectURL(blob);
