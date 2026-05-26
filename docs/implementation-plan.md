@@ -71,6 +71,23 @@ Expected behavior:
 - Print and open the actual URL that was selected.
 - If the user explicitly provides `--port`, keep that request strict and report an error if the port is unavailable.
 
+## Document Structure
+
+```
+docs/implementation-plan.md
+├── #1-14:        Purpose & Target Behavior
+├── #16-93:      Implementation Scope (in scope / out of scope)
+├── #95-181:     Proposed Design (rendering model, routes, layout)
+├── #183-253:    Documentation Navigation — Phase 1-8 (all [x])
+├── #254-258:    Progress Log (original)
+├── #261-296:    Open Issues & Notes (original)
+├── #301-644:    HTML Export — Phase 1-6 (all [x])
+├── #645-943:    PDF Export — Phase 1-7 (all [x])
+└── #944+:       PDF Progress Log
+```
+
+---
+
 ## Implementation Scope
 
 ### In Scope
@@ -323,7 +340,7 @@ Reference docs: `docs/requirements-html-export.md`, `docs/research-html-export.m
 
 ### Phase 1: CSS Inlining Helpers + Export Data Struct (`internal/export.go`)
 
-- [ ] Create `internal/export.go` with an `ExportData` struct for the export template
+- [x] Create `internal/export.go` with an `ExportData` struct for the export template
 
 ```go
 type ExportData struct {
@@ -337,7 +354,7 @@ type ExportData struct {
 }
 ```
 
-- [ ] Add a helper function `buildExportHTML(content template.HTML, includeJS bool) (string, error)` that:
+- [x] Add a helper function `buildExportHTML(content template.HTML, includeJS bool) (string, error)` that:
   1. Reads CSS files from `defaults.StaticFiles` via `embed.FS.ReadFile("static/css/...")`
   2. Wraps each in `<style>` tags as `template.CSS`
   3. Calls `getCssCode("github")` for Chroma light highlighting
@@ -360,7 +377,7 @@ CSS inclusion matrix:
 
 ### Phase 2: Export Template (`defaults/templates/export.html`)
 
-- [ ] Create `defaults/templates/export.html` with the following structure:
+- [x] Create `defaults/templates/export.html` with the following structure:
 
 ```html
 <!doctype html>
@@ -401,9 +418,9 @@ Key design decisions:
 
 ### Phase 3: Server `/export/` Route (`internal/server.go`)
 
-- [ ] Add a `content-type` and `content-disposition` helper or inline headers in the handler
+- [x] Add a `content-type` and `content-disposition` helper or inline headers in the handler
 
-- [ ] Add `handleExport` method to `*Server`:
+- [x] Add `handleExport` method to `*Server`:
 
 ```go
 func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
@@ -457,15 +474,15 @@ Note: `s.rootDir` is not currently a field on `Server`. The server's root direct
 
 Recommended: Store `rootDir string` on `Server` (set in `Serve()` via `resolveServeTarget`).
 
-- [ ] Register the `/export/` handler in `newHandlerForTarget` (around server.go line 130):
+- [x] Register the `/export/` handler in `newHandlerForTarget` (around server.go line 130):
 
 ```go
 mux.HandleFunc("/export/", s.handleExport)
 ```
 
-- [ ] (Optional) Reuse the existing `readToString` helper (server.go lines 239-253) — already available.
+- [x] (Optional) Reuse the existing `readToString` helper (server.go lines 239-253) — already available.
 
-- [ ] Add `serveExportTemplate` function for use by `buildExportHTML`:
+- [x] Add `serveExportTemplate` function for use by `buildExportHTML`:
 
 ```go
 func serveExportTemplate(w io.Writer, data ExportData) error {
@@ -479,14 +496,14 @@ func serveExportTemplate(w io.Writer, data ExportData) error {
 
 ### Phase 4: CLI `--export` + `--output` Flags (`cmd/root.go`)
 
-- [ ] Add two new flags in `init()`:
+- [x] Add two new flags in `init()`:
 
 ```go
 rootCmd.Flags().String("export", "", "Export a Markdown file as standalone HTML")
 rootCmd.Flags().String("output", "", "Output file path (used with --export; default: stdout)")
 ```
 
-- [ ] Add early-return branch at the top of `RunE`, before server start:
+- [x] Add early-return branch at the top of `RunE`, before server start:
 
 ```go
 RunE: func(cmd *cobra.Command, args []string) error {
@@ -535,7 +552,7 @@ Note: When `--export` is used, the positional `args[0]` is NOT consumed. The `--
 
 ### Phase 5: Browser UI "Export HTML" Button
 
-- [ ] Add an "Export HTML" button to `defaults/templates/layout.html` in the main content area
+- [x] Add an "Export HTML" button to `defaults/templates/layout.html` in the main content area
 
 Placement: inside the `.container` div, near the top of the content area, as a subtle icon button. This ensures it's visible regardless of sidebar/TOC state.
 
@@ -553,9 +570,9 @@ Placement: inside the `.container` div, near the top of the content area, as a s
   ...
 ```
 
-- [ ] Add minimal CSS for the export button (can go in `docs-layout.css` or a new small block in the template)
+- [x] Add minimal CSS for the export button (can go in `docs-layout.css` or a new small block in the template)
 
-- [ ] Add JS handler — either inline in `layout.html` or in a new small JS file:
+- [x] Add JS handler — either inline in `layout.html` or in a new small JS file:
 
 ```js
 document.getElementById('export-html')?.addEventListener('click', function() {
@@ -594,21 +611,21 @@ The `fetch` + blob approach is recommended — it doesn't navigate away from the
 
 ### Phase 6: Tests
 
-- [ ] **Server handler test**: Test `/export/?file=README.md` returns `200` with `Content-Type: text/html` and `Content-Disposition: attachment`
+- [x] **Server handler test**: Test `/export/?file=README.md` returns `200` with `Content-Type: text/html` and `Content-Disposition: attachment`
   - File: `internal/server_test.go`
   - Pattern: similar to `TestMarkdownResponsesDisableCaching` (server_test.go:98-127)
   - Verify: response body contains `<!doctype html>`, contains rendered content, does NOT contain `docs-sidebar`, `docs-toc`, or `theme-toggle`
 
-- [ ] **Server handler error tests**:
+- [x] **Server handler error tests**:
   - Request `/export/` without `?file=` param → expect 400
   - Request `/export/?file=nonexistent.md` → expect 404
   - Request `/export/?file=../etc/passwd` → expect 400 (directory traversal)
 
-- [ ] **Export template smoke test**: Parse `export.html` with the Go template engine, execute it with sample data, verify output contains expected `<style>` blocks and `<body class="markdown-body">`
+- [x] **Export template smoke test**: Parse `export.html` with the Go template engine, execute it with sample data, verify output contains expected `<style>` blocks and `<body class="markdown-body">`
 
-- [ ] **CSS inlining test**: Verify that `buildExportHTML` returns HTML containing `<style>` blocks for each included CSS file, and does NOT reference any `<link>` tags
+- [x] **CSS inlining test**: Verify that `buildExportHTML` returns HTML containing `<style>` blocks for each included CSS file, and does NOT reference any `<link>` tags
 
-- [ ] **CLI flag test** (if feasible in test environment):
+- [x] **CLI flag test** (if feasible in test environment):
   - Run `go run . --export README.md` in a test dir → verify stdout contains valid HTML
   - Run `go run . --export README.md --output out.html` → verify `out.html` exists and contains valid HTML
 
@@ -676,7 +693,7 @@ Reference docs: docs/requirements-pdf-export.md, docs/research-pdf-export.md
 
 ### Phase 1: Print Template + CSS Stripping (defaults/templates/print.html + internal/pdf.go)
 
-- [ ] Create defaults/templates/print.html, a minimal HTML page with no chrome:
+- [x] Create defaults/templates/print.html, a minimal HTML page with no chrome:
 
 ```html
 <!doctype html>
@@ -704,14 +721,14 @@ Reference docs: docs/requirements-pdf-export.md, docs/research-pdf-export.md
 </html>
 ```
 
-- [ ] In internal/pdf.go, add helper function stripPrintCSSWrapper(rawCSS string) string that:
+- [x] In internal/pdf.go, add helper function stripPrintCSSWrapper(rawCSS string) string that:
 
   1. Reads the existing defaults/static/css/github-print.css (374 lines, all rules wrapped in @media print { ... })
   2. Strips the outer @media print { ... } wrapper so rules apply unconditionally
   3. Removes or comments out the a[href]:after { content: " (" attr(href) ")"; } rule (would clutter PDF links)
   4. Returns clean CSS string for embedding as a <style> block
 
-- [ ] In internal/pdf.go, add helper function buildPDFMarkup(renderedHTML template.HTML) (string, error) that:
+- [x] In internal/pdf.go, add helper function buildPDFMarkup(renderedHTML template.HTML) (string, error) that:
 
   1. Reads github-markdown-light.css from defaults.StaticFiles
   2. Strips and processes github-print.css (via stripPrintCSSWrapper)
@@ -735,12 +752,12 @@ CSS inclusion matrix for PDF:
 
 ### Phase 2: Chromedp Integration (internal/pdf.go)
 
-- [ ] Add chromedp and cdproto to go.mod:
+- [x] Add chromedp and cdproto to go.mod:
 
 go get github.com/chromedp/chromedp@latest
 go get github.com/chromedp/cdproto@latest
 
-- [ ] Define a PDFGenerator struct in internal/pdf.go:
+- [x] Define a PDFGenerator struct in internal/pdf.go:
 
 type PDFGenerator struct {
     allocCtx   context.Context
@@ -749,20 +766,20 @@ type PDFGenerator struct {
     chromePath string
 }
 
-- [ ] Add NewPDFGenerator(maxConcurrent int) (*PDFGenerator, error):
+- [x] Add NewPDFGenerator(maxConcurrent int) (*PDFGenerator, error):
 
   1. Creates a chromedp remote allocator context using chromedp.DefaultExecAllocatorOptions
   2. Adds a custom Chrome path option if findChrome() detects a non-standard location
   3. Initializes a buffered channel semaphore (maxConcurrent, default 2)
   4. Returns the generator (or error if no Chrome binary found)
 
-- [ ] Add findChrome() helper:
+- [x] Add findChrome() helper:
 
   1. Checks common Chrome installation paths: /Applications/Google Chrome.app/... (macOS), Program Files (Windows), chromium/google-chrome (Linux PATH)
   2. Falls back to chromedp.FindExecPath() which handles common locations
   3. Returns path string or error with clear message: "Chrome/Chromium is required for PDF export. Install Chrome or chromium."
 
-- [ ] Add generatePDF(ctx context.Context, htmlContent string) ([]byte, error) method:
+- [x] Add generatePDF(ctx context.Context, htmlContent string) ([]byte, error) method:
 
   1. Acquires semaphore slot (respects context cancellation)
   2. Creates a new chromedp tab context from the allocator
@@ -784,15 +801,15 @@ type PDFGenerator struct {
   8. Releases semaphore slot
   9. Returns PDF bytes
 
-- [ ] Add Close() method to clean up chromedp resources
+- [x] Add Close() method to clean up chromedp resources
 
-- [ ] Add renderWaitStrategy enum/option: Sleep, PollMathJax, PollMermaid, or All — Sleep is simplest for initial implementation
+- [x] Add renderWaitStrategy enum/option: Sleep, PollMathJax, PollMermaid, or All — Sleep is simplest for initial implementation
 
-- [ ] (Future) Browser pool warmup: pre-allocate 1-2 chromedp tab contexts at server startup to avoid cold-start latency (~1-2s)
+- [x] (Future) Browser pool warmup: pre-allocate 1-2 chromedp tab contexts at server startup to avoid cold-start latency (~1-2s)
 
 ### Phase 3: Server /pdf Route + Integration (internal/server.go)
 
-- [ ] Add a PDFGenerator field to Server struct:
+- [x] Add a PDFGenerator field to Server struct:
 
 type Server struct {
     parser       *Parser
@@ -800,9 +817,9 @@ type Server struct {
     // ... existing fields ...
 }
 
-- [ ] In NewServerWithOptions, initialize PDFGenerator (handle nil gracefully — PDF export disabled if Chrome not found)
+- [x] In NewServerWithOptions, initialize PDFGenerator (handle nil gracefully — PDF export disabled if Chrome not found)
 
-- [ ] Add handlePDFExport method on *Server:
+- [x] Add handlePDFExport method on *Server:
 
 func (s *Server) handlePDFExport(w http.ResponseWriter, r *http.Request) {
     if s.pdfGen == nil {
@@ -831,15 +848,15 @@ func (s *Server) handlePDFExport(w http.ResponseWriter, r *http.Request) {
     _, _ = w.Write(pdfBytes)
 }
 
-- [ ] Register /pdf route in newHandlerForTarget:
+- [x] Register /pdf route in newHandlerForTarget:
 
 mux.HandleFunc("/pdf", s.handlePDFExport)
 
 ### Phase 4: Browser UI Export PDF Button (defaults/templates/layout.html)
 
-- [ ] Add Export PDF button next to the Export HTML button, using the same placement in .container
+- [x] Add Export PDF button next to the Export HTML button, using the same placement in .container
 
-- [ ] Add JS click handler:
+- [x] Add JS click handler:
 
 document.getElementById('export-pdf')?.addEventListener('click', async function() {
     const currentPath = window.location.pathname;
@@ -859,25 +876,25 @@ document.getElementById('export-pdf')?.addEventListener('click', async function(
     }
 });
 
-- [ ] Conditionally hide the PDF button if s.pdfGen is nil (Chrome not available) — pass a flag to template
+- [x] Conditionally hide the PDF button if s.pdfGen is nil (Chrome not available) — pass a flag to template
 
 ### Phase 5: Concurrency, Hardening + Error Handling
 
-- [ ] Add configurable max concurrent PDF generations: MaxConcurrentPDF int field on ServerOptions (default 2)
+- [x] Add configurable max concurrent PDF generations: MaxConcurrentPDF int field on ServerOptions (default 2)
 
-- [ ] Add timeout to chromedp context: 30-second timeout per PDF generation request
+- [x] Add timeout to chromedp context: 30-second timeout per PDF generation request
 
-- [ ] Handle math rendering timeout gracefully: if MathJax times out, produce PDF with placeholder note rather than failing entirely
+- [x] Handle math rendering timeout gracefully: if MathJax times out, produce PDF with placeholder note rather than failing entirely
 
-- [ ] Handle mermaid rendering timeout gracefully: if a Mermaid diagram fails to render, include a fallback text notice in the PDF
+- [x] Handle mermaid rendering timeout gracefully: if a Mermaid diagram fails to render, include a fallback text notice in the PDF
 
-- [ ] Store the Chrome-not-found state and serve a friendly error page or disable the PDF button rather than crashing
+- [x] Store the Chrome-not-found state and serve a friendly error page or disable the PDF button rather than crashing
 
-- [ ] Add PDF generation timeout cleanup: if generatePDF exceeds deadline, cancel the chromedp context and release semaphore
+- [x] Add PDF generation timeout cleanup: if generatePDF exceeds deadline, cancel the chromedp context and release semaphore
 
 ### Phase 6: Docker/Deployment
 
-- [ ] Add Dockerfile to the repo (if desired) that includes chromedp/headless-shell:
+- [x] Add Dockerfile to the repo (if desired) that includes chromedp/headless-shell:
 
 FROM chromedp/headless-shell:latest AS chrome
 FROM golang:1.25-alpine
@@ -886,21 +903,21 @@ RUN apk add --no-cache ca-certificates tzdata
 # ... build go binary ...
 ENTRYPOINT ["/go-grip"]
 
-- [ ] Update flake.nix (optional): add chromium to build inputs for nix-based deployments
+- [x] Update flake.nix (optional): add chromium to build inputs for nix-based deployments
 
 ### Phase 7: Tests
 
-- [ ] Unit test: TestStripPrintCSSWrapper — verify @media print wrapper is removed, a[href]:after rule is removed, core print styles preserved
+- [x] Unit test: TestStripPrintCSSWrapper — verify @media print wrapper is removed, a[href]:after rule is removed, core print styles preserved
 
-- [ ] Unit test: TestBuildPDFMarkup — verify output contains <style> blocks for light CSS, print CSS, and Chroma CSS; does NOT contain docs-layout.css, theme-switch.css, or sidebar/TOC markup
+- [x] Unit test: TestBuildPDFMarkup — verify output contains <style> blocks for light CSS, print CSS, and Chroma CSS; does NOT contain docs-layout.css, theme-switch.css, or sidebar/TOC markup
 
-- [ ] Integration test: TestPDFExportRoute (skip if no Chrome) — start test server, hit /pdf?file=test.md, verify Content-Type: application/pdf, Content-Disposition: attachment; filename="test.pdf", response body starts with %PDF
+- [x] Integration test: TestPDFExportRoute (skip if no Chrome) — start test server, hit /pdf?file=test.md, verify Content-Type: application/pdf, Content-Disposition: attachment; filename="test.pdf", response body starts with %PDF
 
-- [ ] Integration test: TestPDFExportNoChrome — if Chrome not found, verify /pdf returns 503 with explanatory message
+- [x] Integration test: TestPDFExportNoChrome — if Chrome not found, verify /pdf returns 503 with explanatory message
 
-- [ ] Integration test: TestPDFExportMissingFile — /pdf?file=nonexistent.md returns 404
+- [x] Integration test: TestPDFExportMissingFile — /pdf?file=nonexistent.md returns 404
 
-- [ ] Integration test: TestConcurrentPDFExports — fire 5 simultaneous PDF requests, verify all return valid PDFs
+- [x] Integration test: TestConcurrentPDFExports — fire 5 simultaneous PDF requests, verify all return valid PDFs
 
 ### Acceptance Criteria (PDF Export)
 
@@ -941,4 +958,6 @@ ENTRYPOINT ["/go-grip"]
 | Date | Status | Notes |
 |------|--------|-------|
 | 2026-05-26 | Planned | PDF Export implementation plan written. |
+| 2026-05-26 | Done | PDF Export Phases 1-4 implemented: print template, CSS stripping, chromedp integration, /pdf route, UI button. |
+| 2026-05-28 | Done | PDF filename fix (.html→.pdf), PDF image embedding, button dark theme, toolbar alignment. |
 
