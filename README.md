@@ -78,6 +78,12 @@ Additional editor support:
 - Custom `.md`-only file watcher (replaces `aarol/reload`) with WebSocket-based hot reload, exponential backoff reconnection, and debounced change events.
 - Keyboard shortcuts: `Ctrl+S` saves and reloads the browser, `Ctrl+Enter` saves and stays in the editor, `Ctrl+P` toggles the preview panel.
 
+Additional export support:
+
+- **HTML export**: export any rendered Markdown file as a standalone HTML page via the toolbar Export HTML button. The exported file inlines all CSS (light theme, syntax highlighting, mermaid, mathjax, clipboard styles), embeds local images as base64 data URIs, and optionally includes MathJax/Mermaid JavaScript for dynamic rendering.
+- **PDF export**: export any rendered Markdown file as a print-optimized PDF via the toolbar Export PDF button. PDF generation uses a headless Chrome/Chromium instance (chromedp) with A4 page layout, proper margins, and a stripped print CSS that removes URL annotations. Local images are embedded automatically. Requires Chrome or Chromium installed on the system.
+- Image embedding: local image files referenced in Markdown are automatically converted to inline base64 data URIs in both HTML and PDF exports, making the exported files fully self-contained.
+
 Distribution changes:
 
 - This fork uses the module path `github.com/showgp/go-grip`.
@@ -114,6 +120,9 @@ Distribution changes:
 - Preview panel toggle button for distraction-free editing
 - Custom `.md`-only file watcher with WebSocket hot-reload and exponential backoff reconnection
 - Debounced rendering (150ms default, scales to 300ms for 5000+ line documents)
+- **Export HTML**: download any rendered Markdown as a standalone HTML file (inline CSS, embedded images)
+- **Export PDF**: download any rendered Markdown as a print-optimized PDF (A4 layout, headless Chrome/chromedp)
+- Image embedding: local images are automatically base64-encoded and inlined in exported HTML/PDF
 - automatic fallback to the next available port when the default port is busy
 - strict explicit port handling with `-p`
 - optional automatic browser reload control with `--no-reload`
@@ -282,13 +291,24 @@ If the Markdown file changes on disk while the editor is open (e.g., by another 
 
 The browser will reload automatically when a `.md` file changes on disk, unless `--no-reload` is used.
 
+### Export
+
+When viewing a Markdown file, click the **Export HTML** or **Export PDF** button in the toolbar to download the rendered document.
+
+- **Export HTML** downloads a standalone `.html` file with all CSS inlined (light theme, syntax highlighting, mermaid, mathjax, clipboard) and local images embedded as base64 data URIs. The exported page includes MathJax and Mermaid JavaScript for dynamic rendering.
+- **Export PDF** downloads a print-optimized `.pdf` file using a headless Chrome/Chromium instance. The PDF uses A4 page dimensions, proper margins, and a print-tailored CSS that removes URL link annotations. Local images are embedded automatically.
+
+> [!NOTE]
+> PDF export requires **Chrome** or **Chromium** installed on your system and available in `PATH`. The server lazy-initializes the PDF generator on the first export request.
+
 ## :pencil: Examples
 
 <img src="./.github/docs/example-1.png" alt="examples" width="1000"/>
 
 ## :bug: Known TODOs / Bugs
 
-- [ ] Make it possible to export the generated html
+- [x] Export rendered Markdown as standalone HTML
+- [x] Export rendered Markdown as PDF (requires Chrome/Chromium)
 
 ## :pushpin: Similar tools
 
