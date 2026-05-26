@@ -243,13 +243,13 @@ func (g *PDFGenerator) GeneratePDF(htmlContent string) ([]byte, error) {
 			var err error
 			pdfBuf, _, err = page.PrintToPDF().
 				WithPrintBackground(true).
-				WithPaperWidth(210.0/25.4).   // A4 width in inches
-				WithPaperHeight(297.0/25.4).  // A4 height in inches
-				WithMarginTop(1.5/2.54).      // 1.5cm top margin
-				WithMarginBottom(1.5/2.54).   // 1.5cm bottom margin
-				WithMarginLeft(2.0/2.54).     // 2.0cm left margin
-				WithMarginRight(1.5/2.54).    // 1.5cm right margin
-				WithPreferCSSPageSize(true).  // respect CSS @page rules when set
+				WithPaperWidth(210.0 / 25.4).  // A4 width in inches
+				WithPaperHeight(297.0 / 25.4). // A4 height in inches
+				WithMarginTop(1.5 / 2.54).     // 1.5cm top margin
+				WithMarginBottom(1.5 / 2.54).  // 1.5cm bottom margin
+				WithMarginLeft(2.0 / 2.54).    // 2.0cm left margin
+				WithMarginRight(1.5 / 2.54).   // 1.5cm right margin
+				WithPreferCSSPageSize(true).   // respect CSS @page rules when set
 				Do(ctx)
 			return err
 		}),

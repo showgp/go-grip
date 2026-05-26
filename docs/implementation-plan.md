@@ -636,6 +636,7 @@ The `fetch` + blob approach is recommended — it doesn't navigate away from the
 | Date | Status | Notes |
 |------|--------|-------|
 | 2026-05-26 | Implemented | HTML Export implementation complete. All tests pass. See Phase 1-6. |
+| 2026-05-26 | Implemented | PDF Export Phase 1-4 (print template, chromedp integration, server route, UI button) complete. |
 
 ### Open Questions (HTML Export)
 

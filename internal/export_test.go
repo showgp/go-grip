@@ -48,7 +48,7 @@ func TestBuildExportHTML_ContainsExpectedElements(t *testing.T) {
 		`<body class="markdown-body">`,
 		"<h1>Hello</h1>",
 		"<p>Test content</p>",
-		`<style>`,   // CSS is inlined
+		`<style>`, // CSS is inlined
 		"container",
 	} {
 		if !strings.Contains(result, want) {
@@ -111,8 +111,8 @@ func TestBuildExportHTML_ContainsCssFiles(t *testing.T) {
 	// Verify CSS content is inlined (spot-check for known CSS classes)
 	for _, cssClass := range []string{
 		"markdown-body",
-		"chroma",       // Chroma highlighting
-		"mermaid-error", // Mermaid CSS
+		"chroma",         // Chroma highlighting
+		"mermaid-error",  // Mermaid CSS
 		"clipboard-copy", // Clipboard CSS
 	} {
 		if !strings.Contains(result, cssClass) {
