@@ -50,6 +50,38 @@
     <link rel="stylesheet" href="/static/css/theme-switch.css" />
     <link rel="stylesheet" href="/static/css/docs-layout.css" />
     <link rel="stylesheet" href="/static/css/editor.css" />
+    <style>
+      .docs-export-bar {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        margin-bottom: 12px;
+      }
+      .docs-export-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 4px 10px;
+        font-size: 12px;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        line-height: 1.5;
+        color: #656d76;
+        background: transparent;
+        border: 1px solid #d0d7de;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: color 0.15s, border-color 0.15s;
+      }
+      .docs-export-btn:hover {
+        color: #0969da;
+        border-color: #0969da;
+      }
+      .docs-export-btn svg {
+        width: 14px;
+        height: 14px;
+        flex-shrink: 0;
+      }
+    </style>
     <script src="/static/js/theme-switch.js"></script>
     <script src="/static/js/clipboard-copy.js"></script>
     <script src="/static/js/mathjax-options.js"></script>
@@ -87,6 +119,13 @@
           {{if .CurrentFile}}
           <div class="preview-toolbar">
             <button class="editor-btn editor-btn-edit">Edit</button>
+            <button id="export-html" class="docs-export-btn" title="Export as HTML">
+              <svg aria-hidden="true" viewBox="0 0 16 16" fill="currentColor" width="14" height="14">
+                <path d="M2.75 1h10.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-3.5a.75.75 0 0 1 0-1.5h2.75v-9H3.5v2.25a.75.75 0 0 1-1.5 0V1.75A.75.75 0 0 1 2.75 1Z"/>
+                <path d="M7.47 5.22a.75.75 0 0 1 1.06 0l3 3a.75.75 0 0 1-1.06 1.06L8.75 7.56v5.69a.75.75 0 0 1-1.5 0V7.56L5.53 9.28a.75.75 0 0 1-1.06-1.06l3-3Z"/>
+              </svg>
+              Export HTML
+            </button>
           </div>
           {{end}}
 
@@ -161,5 +200,26 @@
       </div>
     </footer>
     {{end}}
+  <script>
+    document.getElementById('export-html')?.addEventListener('click', async function() {
+      const currentPath = window.location.pathname;
+      if (!currentPath.endsWith('.md')) return;
+      try {
+        const resp = await fetch('/export?file=' + encodeURIComponent(currentPath.replace(/^\//, '')));
+        if (!resp.ok) throw new Error(await resp.text());
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = currentPath.split('/').pop().replace(/\.md$/i, '.html');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        alert('Export failed: ' + e.message);
+      }
+    });
+  </script>
   </body>
 </html>

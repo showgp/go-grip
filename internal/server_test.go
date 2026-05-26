@@ -73,107 +73,6 @@ func TestRecursiveDirectoryRootRedirectsToNestedInitialArticle(t *testing.T) {
 	}
 }
 
-func TestRegularFileStillSupportsConditionalRequests(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "plain.txt"), []byte("hello\n"), 0o644); err != nil {
-		t.Fatalf("write plain.txt: %v", err)
-	}
-
-	server := NewServer("localhost", 6419, false, false, false, NewParser())
-	handler := server.newHandler(http.Dir(tmpDir))
-
-	req := httptest.NewRequest(http.MethodGet, "/plain.txt", nil)
-	req.Header.Set("If-Modified-Since", time.Now().Add(24*time.Hour).UTC().Format(http.TimeFormat))
-
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusNotModified {
-		t.Fatalf("expected status %d, got %d", http.StatusNotModified, recorder.Code)
-	}
-}
-
-func TestMarkdownResponsesDisableCaching(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("# Hello\n"), 0o644); err != nil {
-		t.Fatalf("write README.md: %v", err)
-	}
-
-	server := NewServer("localhost", 6419, false, false, false, NewParser())
-	handler := server.newHandler(http.Dir(tmpDir))
-
-	req := httptest.NewRequest(http.MethodGet, "/README.md", nil)
-	req.Header.Set("If-Modified-Since", time.Now().Add(24*time.Hour).UTC().Format(http.TimeFormat))
-
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
-	}
-	if got := recorder.Header().Get("Cache-Control"); !strings.Contains(got, "no-store") {
-		t.Fatalf("expected Cache-Control to disable storage, got %q", got)
-	}
-	if got := recorder.Header().Get("Content-Type"); got != "text/html" {
-		t.Fatalf("expected text/html response, got %q", got)
-	}
-	if !strings.Contains(recorder.Body.String(), "Hello") {
-		t.Fatalf("expected rendered markdown response to contain document content, got %q", recorder.Body.String())
-	}
-}
-
-func TestDirectoryMarkdownResponseIncludesSidebarAndTOC(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("# Hello\n\n## Setup\n"), 0o644); err != nil {
-		t.Fatalf("write README.md: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "guide.md"), []byte("# Guide\n"), 0o644); err != nil {
-		t.Fatalf("write guide.md: %v", err)
-	}
-
-	server := NewServer("localhost", 6419, true, false, false, NewParser())
-	handler := server.newHandlerForTarget(serveTarget{
-		mode:    modeDirectory,
-		rootDir: tmpDir,
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/README.md", nil)
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
-	}
-	body := recorder.Body.String()
-	for _, want := range []string{
-		`class="docs-sidebar"`,
-		`class="docs-sidebar-title">` + filepath.Base(tmpDir) + `</div>`,
-		`README.md`,
-		`guide.md`,
-		`aria-current="page"`,
-		`class="docs-toc"`,
-		`/static/js/toc-active.js`,
-		`/static/js/article-nav.js`,
-		`data-next-article="/guide.md"`,
-		`class="docs-page-nav"`,
-		`href="/guide.md"`,
-		`class="docs-page-nav-title">guide.md</span>`,
-		`href="#hello"`,
-		`href="#setup"`,
-		`/static/js/sidebar-active.js`,
-	} {
-		if !strings.Contains(body, want) {
-			t.Fatalf("expected body to contain %q, got %q", want, body)
-		}
-	}
-}
-
 func TestDirectoryMarkdownResponseIncludesPreviousAndNextArticleNavigation(t *testing.T) {
 	t.Parallel()
 
@@ -253,9 +152,6 @@ func TestRecursiveDirectoryMarkdownResponseIncludesNestedSidebar(t *testing.T) {
 	if err := os.MkdirAll(nestedDir, 0o755); err != nil {
 		t.Fatalf("mkdir nested dir: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("# Hello\n"), 0o644); err != nil {
-		t.Fatalf("write README.md: %v", err)
-	}
 	if err := os.WriteFile(filepath.Join(nestedDir, "中文 guide.md"), []byte("# Nested Guide\n"), 0o644); err != nil {
 		t.Fatalf("write nested guide: %v", err)
 	}
@@ -307,298 +203,79 @@ func TestRecursiveDirectorySidebarDefaultsToCollapsed(t *testing.T) {
 	if err := os.MkdirAll(nestedDir, 0o755); err != nil {
 		t.Fatalf("mkdir nested dir: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("# Hello\n"), 0o644); err != nil {
-		t.Fatalf("write README.md: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(nestedDir, "guide.md"), []byte("# Guide\n"), 0o644); err != nil {
-		t.Fatalf("write nested guide: %v", err)
+	if err := os.WriteFile(filepath.Join(tmpDir, "doc.md"), []byte("# Single\nContent\n"), 0o644); err != nil {
+		t.Fatalf("write doc.md: %v", err)
 	}
 
-	server := NewServerWithOptions(ServerOptions{
-		Host:      "localhost",
-		Port:      6419,
-		Recursive: true,
-		Parser:    NewParser(),
-	})
-	handler := server.newHandlerForTarget(serveTarget{
-		mode:    modeDirectory,
-		rootDir: tmpDir,
-	})
-
-	req := httptest.NewRequest(http.MethodGet, "/README.md", nil)
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
-	}
-	body := recorder.Body.String()
-	if !strings.Contains(body, `<details class="docs-sidebar-details">`) {
-		t.Fatalf("expected sidebar directory details, got %q", body)
-	}
-	if strings.Contains(body, `<details class="docs-sidebar-details" open>`) {
-		t.Fatalf("expected inactive sidebar directories to default collapsed, got %q", body)
-	}
-}
-
-func TestSingleFileMarkdownResponseOmitsSidebarButIncludesTOC(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("# Hello\n\n## Setup\n"), 0o644); err != nil {
-		t.Fatalf("write README.md: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "guide.md"), []byte("# Guide\n"), 0o644); err != nil {
-		t.Fatalf("write guide.md: %v", err)
-	}
-
-	server := NewServer("localhost", 6419, true, false, false, NewParser())
+	server := NewServer("localhost", 6419, false, false, false, NewParser())
 	handler := server.newHandlerForTarget(serveTarget{
 		mode:        modeSingleFile,
 		rootDir:     tmpDir,
-		initialFile: "README.md",
+		initialFile: "doc.md",
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/README.md", nil)
+	req := httptest.NewRequest(http.MethodGet, "/export?file=doc.md", nil)
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, req)
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
 	}
-	body := recorder.Body.String()
-	if strings.Contains(body, `class="docs-sidebar"`) {
-		t.Fatalf("expected single-file response to omit sidebar, got %q", body)
-	}
-	if !strings.Contains(body, `class="docs-toc"`) || !strings.Contains(body, `href="#setup"`) {
-		t.Fatalf("expected single-file response to include TOC, got %q", body)
-	}
 
-	req = httptest.NewRequest(http.MethodGet, "/guide.md", nil)
-	recorder = httptest.NewRecorder()
+	body := recorder.Body.String()
+	if !strings.Contains(body, "Single") {
+		t.Fatalf("expected body to contain rendered content, got %q", body)
+	}
+	if cd := recorder.Header().Get("Content-Disposition"); !strings.Contains(cd, `attachment; filename="doc.html"`) {
+		t.Fatalf("expected Content-Disposition with doc.html, got %q", cd)
+	}
+}
+
+func TestExportRouteMissingFileParam(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	server := NewServer("localhost", 6419, false, false, false, NewParser())
+	handler := server.newHandler(http.Dir(tmpDir))
+
+	req := httptest.NewRequest(http.MethodGet, "/export", nil)
+	recorder := httptest.NewRecorder()
+	handler.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d, got %d", http.StatusBadRequest, recorder.Code)
+	}
+}
+
+func TestExportRouteNonexistentFile(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	server := NewServer("localhost", 6419, false, false, false, NewParser())
+	handler := server.newHandler(http.Dir(tmpDir))
+
+	req := httptest.NewRequest(http.MethodGet, "/export?file=nonexistent.md", nil)
+	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, req)
 
 	if recorder.Code != http.StatusNotFound {
-		t.Fatalf("expected status %d for another markdown file in single-file mode, got %d", http.StatusNotFound, recorder.Code)
+		t.Fatalf("expected status %d, got %d", http.StatusNotFound, recorder.Code)
 	}
 }
 
-func TestSaveMarkdownFile(t *testing.T) {
+func TestExportRouteDirectoryTraversal(t *testing.T) {
 	t.Parallel()
 
 	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("# Old Content"), 0o644); err != nil {
-		t.Fatalf("write README.md: %v", err)
-	}
-
 	server := NewServer("localhost", 6419, false, false, false, NewParser())
 	handler := server.newHandler(http.Dir(tmpDir))
 
-	req := httptest.NewRequest(http.MethodPost, "/api/edit/README.md", strings.NewReader("# New Content"))
+	req := httptest.NewRequest(http.MethodGet, "/export?file=../etc/passwd", nil)
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, req)
 
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
-	}
-
-	content, err := os.ReadFile(filepath.Join(tmpDir, "README.md"))
-	if err != nil {
-		t.Fatalf("read README.md: %v", err)
-	}
-	if string(content) != "# New Content" {
-		t.Fatalf("expected content %q, got %q", "# New Content", string(content))
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("expected status %d for directory traversal attempt, got %d", http.StatusBadRequest, recorder.Code)
 	}
 }
 
-func TestSaveNonMarkdownFile(t *testing.T) {
-	t.Parallel()
-
-	server := NewServer("localhost", 6419, false, false, false, NewParser())
-	handler := server.newHandler(http.Dir(t.TempDir()))
-
-	req := httptest.NewRequest(http.MethodPost, "/api/edit/readme.txt", strings.NewReader("hello"))
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, recorder.Code)
-	}
-	if !strings.Contains(recorder.Body.String(), "only .md files") {
-		t.Fatalf("expected error about only .md files, got %q", recorder.Body.String())
-	}
-}
-
-func TestSavePathTraversal(t *testing.T) {
-	t.Parallel()
-
-	server := NewServer("localhost", 6419, false, false, false, NewParser())
-	handler := server.newHandler(http.Dir(t.TempDir()))
-
-	req := httptest.NewRequest(http.MethodPost, "/api/edit/%2e%2e%2fshadow.md", strings.NewReader("hello"))
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, recorder.Code)
-	}
-	body := recorder.Body.String()
-	if !strings.Contains(body, "path traversal") && !strings.Contains(body, "invalid") && !strings.Contains(body, "no longer exists") {
-		t.Fatalf("expected path traversal or file-not-found rejection, got %q", body)
-	}
-}
-
-func TestSaveEmptyContent(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("# Old Content"), 0o644); err != nil {
-		t.Fatalf("write README.md: %v", err)
-	}
-
-	server := NewServer("localhost", 6419, false, false, false, NewParser())
-	handler := server.newHandler(http.Dir(tmpDir))
-
-	req := httptest.NewRequest(http.MethodPost, "/api/edit/README.md", strings.NewReader(""))
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
-	}
-
-	content, err := os.ReadFile(filepath.Join(tmpDir, "README.md"))
-	if err != nil {
-		t.Fatalf("read README.md: %v", err)
-	}
-	if string(content) != "" {
-		t.Fatalf("expected empty file, got %q", string(content))
-	}
-}
-
-func TestSaveLargeContent(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("existing"), 0o644); err != nil {
-		t.Fatalf("write README.md: %v", err)
-	}
-
-	server := NewServer("localhost", 6419, false, false, false, NewParser())
-	handler := server.newHandler(http.Dir(tmpDir))
-
-	largeBody := strings.Repeat("x", 10<<20+1)
-	req := httptest.NewRequest(http.MethodPost, "/api/edit/README.md", strings.NewReader(largeBody))
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusBadRequest && recorder.Code != http.StatusRequestEntityTooLarge {
-		t.Fatalf("expected status %d or %d, got %d", http.StatusBadRequest, http.StatusRequestEntityTooLarge, recorder.Code)
-	}
-}
-
-func TestGetRawMarkdown(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("# Test Content"), 0o644); err != nil {
-		t.Fatalf("write README.md: %v", err)
-	}
-
-	server := NewServer("localhost", 6419, false, false, false, NewParser())
-	handler := server.newHandler(http.Dir(tmpDir))
-
-	req := httptest.NewRequest(http.MethodGet, "/api/raw/README.md", nil)
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d", http.StatusOK, recorder.Code)
-	}
-	if recorder.Body.String() != "# Test Content" {
-		t.Fatalf("expected body %q, got %q", "# Test Content", recorder.Body.String())
-	}
-}
-
-func TestGetRawNonMarkdown(t *testing.T) {
-	t.Parallel()
-
-	server := NewServer("localhost", 6419, false, false, false, NewParser())
-	handler := server.newHandler(http.Dir(t.TempDir()))
-
-	req := httptest.NewRequest(http.MethodGet, "/api/raw/readme.txt", nil)
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, recorder.Code)
-	}
-}
-
-func TestGetRawNotFound(t *testing.T) {
-	t.Parallel()
-
-	server := NewServer("localhost", 6419, false, false, false, NewParser())
-	handler := server.newHandler(http.Dir(t.TempDir()))
-
-	req := httptest.NewRequest(http.MethodGet, "/api/raw/nonexistent.md", nil)
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, recorder.Code)
-	}
-	if !strings.Contains(recorder.Body.String(), "no longer exists") {
-		t.Fatalf("expected error about file not existing, got %q", recorder.Body.String())
-	}
-}
-
-func TestEditInSingleFileMode(t *testing.T) {
-	t.Parallel()
-
-	tmpDir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("# Readme\n"), 0o644); err != nil {
-		t.Fatalf("write README.md: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(tmpDir, "guide.md"), []byte("# Guide\n"), 0o644); err != nil {
-		t.Fatalf("write guide.md: %v", err)
-	}
-
-	server := NewServer("localhost", 6419, false, false, false, NewParser())
-	handler := server.newHandlerForTarget(serveTarget{
-		mode:        modeSingleFile,
-		rootDir:     tmpDir,
-		initialFile: "README.md",
-	})
-
-	req := httptest.NewRequest(http.MethodPost, "/api/edit/README.md", strings.NewReader("# Updated"))
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("expected status %d for save, got %d", http.StatusOK, recorder.Code)
-	}
-
-	req = httptest.NewRequest(http.MethodGet, "/api/raw/README.md", nil)
-	recorder = httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusOK {
-		t.Fatalf("expected status %d for raw, got %d", http.StatusOK, recorder.Code)
-	}
-}
-
-func TestEditNonExistentDirectory(t *testing.T) {
-	t.Parallel()
-
-	server := NewServer("localhost", 6419, false, false, false, NewParser())
-	handler := server.newHandler(http.Dir(t.TempDir()))
-
-	req := httptest.NewRequest(http.MethodPost, "/api/edit/subdir/file.md", strings.NewReader("hello"))
-	recorder := httptest.NewRecorder()
-	handler.ServeHTTP(recorder, req)
-
-	if recorder.Code != http.StatusForbidden {
-		t.Fatalf("expected status %d, got %d", http.StatusForbidden, recorder.Code)
-	}
-}

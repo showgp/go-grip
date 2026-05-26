@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+	"html/template"
 	"os"
 
 	"github.com/showgp/go-grip/internal"
@@ -12,6 +14,36 @@ var rootCmd = &cobra.Command{
 	Short: "Render markdown document as html",
 	Args:  cobra.MatchAll(cobra.OnlyValidArgs),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		exportFile, _ := cmd.Flags().GetString("export")
+		outputFile, _ := cmd.Flags().GetString("output")
+
+		if exportFile != "" {
+			data, err := os.ReadFile(exportFile)
+			if err != nil {
+				return fmt.Errorf("read %q: %w", exportFile, err)
+			}
+
+			parser := internal.NewParser()
+			rendered, err := parser.Render(data)
+			if err != nil {
+				return fmt.Errorf("render %q: %w", exportFile, err)
+			}
+
+			htmlContent, err := internal.BuildExportHTML(template.HTML(rendered.Content), false)
+			if err != nil {
+				return fmt.Errorf("build export HTML: %w", err)
+			}
+
+			if outputFile != "" {
+				if err := os.WriteFile(outputFile, []byte(htmlContent), 0o644); err != nil {
+					return fmt.Errorf("write %q: %w", outputFile, err)
+				}
+			} else {
+				fmt.Print(htmlContent)
+			}
+			return nil
+		}
+
 		browser, _ := cmd.Flags().GetBool("browser")
 		host, _ := cmd.Flags().GetString("host")
 		port, _ := cmd.Flags().GetInt("port")
@@ -53,4 +85,6 @@ func init() {
 	rootCmd.Flags().Bool("bounding-box", true, "Add bounding box to HTML")
 	rootCmd.Flags().Bool("no-reload", false, "Disable automatic browser reload on file changes")
 	rootCmd.Flags().BoolP("recursive", "r", false, "Include nested Markdown files in directory sidebar")
+	rootCmd.Flags().String("export", "", "Export a Markdown file as standalone HTML and exit")
+	rootCmd.Flags().String("output", "", "Output file path (used with --export; default: stdout)")
 }

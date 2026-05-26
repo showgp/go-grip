@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>go-grip export</title>
+  <style>{{ .CssLight }}</style>
+  <style>{{ .CssCodeLight }}</style>
+  <style>{{ .CssMermaid }}</style>
+  <style>{{ .CssMathJax }}</style>
+  <style>{{ .CssClipboard }}</style>
+  {{ if .IncludeJS }}
+  <script src="/static/js/mathjax-options.js"></script>
+  <script src="/static/js/tex-mml-chtml.js"></script>
+  <script src="/static/js/mermaid.min.js"></script>
+  <script src="/static/js/mermaid-init.js"></script>
+  <script src="/static/js/clipboard-copy.js"></script>
+  {{ end }}
+</head>
+<body class="markdown-body">
+  <div class="container">
+    <div class="container-inner">
+      {{ .Content }}
+    </div>
+  </div>
+</body>
+</html>

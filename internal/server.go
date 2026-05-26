@@ -33,6 +33,7 @@ type Server struct {
 	enableReload bool
 	strictPort   bool
 	recursive    bool
+	rootDir      string
 }
 
 type ServerOptions struct {
@@ -78,6 +79,7 @@ func (s *Server) Serve(file string) error {
 	if err != nil {
 		return err
 	}
+	s.rootDir = target.rootDir
 
 	var reloadMiddleware *hotreload.Reloader
 	if s.enableReload {
@@ -120,6 +122,7 @@ func (s *Server) Serve(file string) error {
 }
 
 func (s *Server) newHandler(dir http.Dir) http.Handler {
+	s.rootDir = string(dir)
 	target := serveTarget{
 		mode:    modeDirectory,
 		rootDir: string(dir),
@@ -128,12 +131,14 @@ func (s *Server) newHandler(dir http.Dir) http.Handler {
 }
 
 func (s *Server) newHandlerForTarget(target serveTarget) http.Handler {
+	s.rootDir = target.rootDir
 	dir := http.Dir(target.rootDir)
 	fileServer := http.FileServer(dir)
 	mux := http.NewServeMux()
 	mux.Handle("/static/", http.FileServer(http.FS(defaults.StaticFiles)))
 	mux.HandleFunc("/api/edit/", s.handleSave(dir))
 	mux.HandleFunc("/api/raw/", s.handleRaw(dir))
+	mux.HandleFunc("/export", s.handleExport)
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		requestFile := cleanRequestPath(r.URL.Path)
@@ -242,6 +247,50 @@ func (s *Server) newPageData(target serveTarget, currentFile string, content tem
 		CurrentFile:     currentFile,
 		RawContent:      rawContent,
 	}, nil
+}
+
+func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
+	fileParam := r.URL.Query().Get("file")
+	if fileParam == "" {
+		http.Error(w, "missing file parameter", http.StatusBadRequest)
+		return
+	}
+
+	// Prevent directory traversal (both raw and after normalization)
+	if strings.Contains(fileParam, "..") {
+		http.Error(w, "invalid file path", http.StatusBadRequest)
+		return
+	}
+	cleaned := path.Clean("/" + fileParam)[1:]
+	if cleaned == "" || strings.HasPrefix(cleaned, "/") || strings.Contains(cleaned, "..") {
+		http.Error(w, "invalid file path", http.StatusBadRequest)
+		return
+	}
+
+	dir := http.Dir(s.rootDir)
+	bytes, err := readToString(dir, cleaned)
+	if err != nil {
+		http.Error(w, "file not found: "+fileParam, http.StatusNotFound)
+		return
+	}
+
+	rendered, err := s.parser.Render(bytes)
+	if err != nil {
+		http.Error(w, "render error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	htmlContent, err := BuildExportHTML(template.HTML(rendered.Content), true)
+	if err != nil {
+		http.Error(w, "export error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	outName := ExportFilename(fileParam)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, outName))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(htmlContent))
 }
 
 func readToString(dir http.Dir, filename string) ([]byte, error) {
