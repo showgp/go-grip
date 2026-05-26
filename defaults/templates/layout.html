@@ -81,6 +81,17 @@
         height: 14px;
         flex-shrink: 0;
       }
+      .docs-export-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .docs-export-btn.loading svg {
+        animation: docs-spin 1s linear infinite;
+      }
+      @keyframes docs-spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
     </style>
     <script src="/static/js/theme-switch.js"></script>
     <script src="/static/js/clipboard-copy.js"></script>
@@ -118,7 +129,7 @@
           <!-- 预览工具栏 -->
           {{if .CurrentFile}}
           <div class="preview-toolbar">
-            <button class="editor-btn editor-btn-edit">Edit</button>
+            <button class="docs-export-btn editor-btn-edit">Edit</button>
             <button id="export-html" class="docs-export-btn" title="Export as HTML">
               <svg aria-hidden="true" viewBox="0 0 16 16" fill="currentColor" width="14" height="14">
                 <path d="M2.75 1h10.5a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-3.5a.75.75 0 0 1 0-1.5h2.75v-9H3.5v2.25a.75.75 0 0 1-1.5 0V1.75A.75.75 0 0 1 2.75 1Z"/>
@@ -228,7 +239,9 @@
     });
     document.getElementById('export-pdf')?.addEventListener('click', async function() {
       const currentPath = window.location.pathname;
-      if (!currentPath.endsWith('.md')) return;
+      if (!currentPath.endsWith('.md') || this.disabled) return;
+      this.disabled = true;
+      this.classList.add('loading');
       try {
         const resp = await fetch('/pdf?file=' + encodeURIComponent(currentPath.replace(/^\//, '')));
         if (!resp.ok) throw new Error(await resp.text());
@@ -241,7 +254,11 @@
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        this.disabled = false;
+        this.classList.remove('loading');
       } catch (e) {
+        this.disabled = false;
+        this.classList.remove('loading');
         alert('Export failed: ' + e.message);
       }
     });
