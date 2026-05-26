@@ -1,6 +1,6 @@
 [tools]
 go = "1.25"
-golangci-lint = "2.7"
+golangci-lint = "2.12"
 prek = "latest"
 
 [tasks.all]

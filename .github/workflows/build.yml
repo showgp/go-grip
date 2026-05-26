@@ -32,4 +32,5 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
-          version: v2.1.2
+          # v2.9+ built with Go 1.26; must stay aligned when Go version changes
+          version: v2.12.2
