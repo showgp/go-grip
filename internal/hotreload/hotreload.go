@@ -258,11 +258,12 @@ func (r *Reloader) serveWS(w http.ResponseWriter, req *http.Request) {
 	r.clients[cl] = true
 	r.clientsMu.Unlock()
 
-	_ = conn.SetReadDeadline(time.Now().Add(1 * time.Minute))
-	_, _, err = conn.ReadMessage()
-	if err != nil {
-		r.errorLog.Printf("read error: %s\n", err)
-	}
+	// No read deadline: the client never sends messages, so we keep the
+	// connection open indefinitely. ReadMessage blocks until the browser
+	// tab closes, navigates away, or the page is refreshed — at which
+	// point it returns a websocket.CloseError (typically code 1001
+	// "going away"). This is normal WebSocket lifecycle, not a failure.
+	_, _, _ = conn.ReadMessage()
 
 	r.clientsMu.Lock()
 	delete(r.clients, cl)
@@ -283,7 +284,6 @@ function listen(isRetry) {
   var ws = new WebSocket(protocol + location.host + "%s?v=%s")
   ws.onopen = function() {
     retryDelay = 1000
-    if(isRetry && document.body.getAttribute("data-editing") !== "true") { window.location.reload() }
   }
   ws.onmessage = function(msg) {
     if(msg.data.startsWith("reload:")) {

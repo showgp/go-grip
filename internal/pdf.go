@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os/exec"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/chromedp/cdproto/page"
@@ -146,7 +145,6 @@ type PDFGenerator struct {
 	allocCtx      context.Context
 	allocCancel   context.CancelFunc
 	sem           chan struct{}
-	mu            sync.Mutex
 	chromePath    string
 	maxConcurrent int
 }
