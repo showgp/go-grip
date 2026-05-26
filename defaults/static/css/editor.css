@@ -348,6 +348,14 @@
   max-width: min(80vw, 1400px);
 }
 
+/* container-inner wraps toolbar + editor in edit mode; must pass flex height */
+[data-editing="true"] .docs-main .container-inner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 [data-editing="true"] .editor-container {
   flex: 1;
   display: flex;
