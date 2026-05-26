@@ -237,7 +237,70 @@ goldmark v1.7.16 (核心渲染引擎)
 
 ---
 
-## 十一、开放问题与改进方向
+## 十一、CI/CD 注意事项
+
+> 以下为 v0.11.0 发布过程中遇到的 CI 问题记录，后续 tag 发布时注意规避。
+
+### 11.1 gofmt 格式
+
+`.github/workflows/build.yml` 的 `Build` job 包含 `gofmt -d .` 检查。若 CI 因此失败：
+
+```bash
+gofmt -w <文件1> <文件2>
+```
+
+注意 `gofmt` 会修正：
+- 注释与代码之间的对齐间距（`//` 前的空格数）
+- 文件末尾是否有多余空行
+
+commit 前养成 `gofmt -w .` 习惯可以避免此问题。
+
+### 11.2 golangci-lint 与 Go 版本不兼容
+
+`.github/workflows/build.yml` 中：
+
+```yaml
+- name: golangci-lint
+  uses: golangci/golangci-lint-action@v8
+  with:
+    install-mode: none         # ❌ 使用预装版本，可能不兼容新版 Go
+```
+
+GitHub Runner 预装的 `golangci-lint` 用 Go 1.25 构建。当 `go.mod` 中 `go 1.26`（由 chromedp/cdproto 引入）时，预装 linter 报错：
+
+```
+can't load config: the Go language version (go1.25) used to build
+golangci-lint is lower than the targeted Go version (1.26)
+```
+
+**修复**：明确指定 linter 版本，禁止使用预装版：
+
+```yaml
+- name: golangci-lint
+  uses: golangci/golangci-lint-action@v8
+  with:
+    version: v2.1.2   # ✅ 主动下载兼容版本
+```
+
+> 如果后续升级 Go 版本，同步更新 `version` 字段。
+
+### 11.3 Tag 与工作流触发
+
+- Release 工作流由 `push: tags: "v*"` 触发，仅包含打包和发布，不运行 golangci-lint
+- 如果 tag 创建后发现代码有问题，需要：`git tag -d <tag>` → `git push --delete github <tag>` → 修复代码 → `git tag -a <tag>` → `git push github <tag>`
+- tag 删除重建会重新触发 Release workflow
+
+### 11.4 Pre-push 钩子
+
+CodeWhale 的 pre-push 钩子会在每次 `git push` 前运行 `go test ./...`。合并冲突或跨 commit 的操作（如 rebase 后 push）可能导致 pre-push 测试失败。此时可用 `--no-verify` 绕过：
+
+```bash
+git push github main --no-verify
+```
+
+---
+
+## 十二、开放问题与改进方向
 
 1. **侧边栏标题来源** — 目前显示文件名，可考虑从文件首个 `h1` 推导
 2. **隐藏文件策略** — 是否默认忽略 `.` 开头的文件和目录
