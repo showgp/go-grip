@@ -32,4 +32,4 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
-          install-mode: none
+          version: v2.1.2
