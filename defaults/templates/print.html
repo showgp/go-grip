@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>go-grip export</title>
+  <style>{{ .CssLight }}</style>
+  <style>{{ .CssPrint }}</style>
+  <style>{{ .CssCodeLight }}</style>
+  <style>body { background: #fff !important; }</style>
+  <script>window.MathJax = {tex: {inlineMath: [['$','$'],['\\(','\\)']]}, svg: {fontCache: 'global'}};</script>
+  <script src="/static/js/tex-mml-chtml.js"></script>
+  <script src="/static/js/mermaid.min.js"></script>
+  <script>mermaid.initialize({startOnLoad:true,theme:'default'});</script>
+  <script src="/static/js/clipboard-copy.js"></script>
+</head>
+<body class="markdown-body">
+  <div class="container">
+    <div class="container-inner">
+      {{ .Content }}
+    </div>
+  </div>
+</body>
+</html>
