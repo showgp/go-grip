@@ -156,6 +156,17 @@
       {{if .ShowSidebar}}
       <aside class="docs-sidebar" aria-label="Markdown articles">
         <div class="docs-sidebar-title">{{.SidebarTitle}}</div>
+        <div class="docs-sidebar-search-wrap">
+          <svg class="docs-sidebar-search-icon" aria-hidden="true" viewBox="0 0 24 24" width="16" height="16">
+            <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          <input type="search" class="docs-sidebar-search" placeholder="Filter articles…" aria-label="Filter articles" autocomplete="off">
+          <button class="docs-sidebar-search-clear" aria-label="Clear search" type="button">
+            <svg viewBox="0 0 16 16" width="12" height="12">
+              <path fill="currentColor" d="M5.28 4.22a.75.75 0 0 0-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 0 0 1.06 1.06L8 9.06l2.72 2.72a.75.75 0 0 0 1.06-1.06L9.06 8l2.72-2.72a.75.75 0 0 0-1.06-1.06L8 6.94 5.28 4.22Z"/>
+            </svg>
+          </button>
+        </div>
         {{if .Articles}}
         <nav>
           {{template "articleList" .Articles}}

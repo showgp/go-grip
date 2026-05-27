@@ -348,6 +348,95 @@
   font-size: 13px;
 }
 
+.docs-sidebar-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.docs-sidebar-search-icon {
+  position: absolute;
+  left: 8px;
+  color: #656d76;
+  pointer-events: none;
+}
+
+.docs-sidebar-search {
+  width: 100%;
+  height: 30px;
+  padding: 0 28px 0 28px;
+  font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.35;
+  color: #1f2328;
+  background: #f6f8fa;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.docs-sidebar-search::placeholder {
+  color: #656d76;
+  opacity: 1;
+}
+
+.docs-sidebar-search:focus {
+  border-color: #0969da;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(9, 105, 218, 0.15);
+}
+
+.docs-sidebar-search::-webkit-search-decoration,
+.docs-sidebar-search::-webkit-search-cancel-button,
+.docs-sidebar-search::-webkit-search-results-button,
+.docs-sidebar-search::-webkit-search-results-decoration {
+  display: none;
+}
+
+.docs-sidebar-search-clear {
+  position: absolute;
+  right: 6px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: #656d76;
+  background: none;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.docs-sidebar-search-clear:hover {
+  color: #1f2328;
+  background: #d0d7de;
+}
+
+.docs-sidebar-search-clear.visible {
+  display: flex;
+}
+
+.docs-sidebar-article-hidden,
+.docs-sidebar-directory-hidden {
+  display: none !important;
+}
+
+.docs-sidebar-no-results {
+  margin: 0;
+  padding: 7px 8px;
+  color: #57606a;
+  font-size: 13px;
+}
+
+.docs-sidebar-no-results-hidden {
+  display: none !important;
+}
+
 .docs-empty h1 {
   margin-top: 0;
 }
@@ -425,6 +514,39 @@
   .docs-page-nav-title {
     color: #f0f6fc;
   }
+
+  .docs-sidebar-search-icon {
+    color: #8b949e;
+  }
+
+  .docs-sidebar-search {
+    color: #f0f6fc;
+    background: #161b22;
+    border-color: #30363d;
+  }
+
+  .docs-sidebar-search::placeholder {
+    color: #8b949e;
+  }
+
+  .docs-sidebar-search:focus {
+    border-color: #58a6ff;
+    background: #0d1117;
+    box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.15);
+  }
+
+  .docs-sidebar-search-clear {
+    color: #8b949e;
+  }
+
+  .docs-sidebar-search-clear:hover {
+    color: #f0f6fc;
+    background: #30363d;
+  }
+
+  .docs-sidebar-no-results {
+    color: #8b949e;
+  }
 }
 
 [data-theme="dark"] .docs-sidebar,
@@ -495,6 +617,39 @@
   color: #f0f6fc;
 }
 
+[data-theme="dark"] .docs-sidebar-search-icon {
+  color: #8b949e;
+}
+
+[data-theme="dark"] .docs-sidebar-search {
+  color: #f0f6fc;
+  background: #161b22;
+  border-color: #30363d;
+}
+
+[data-theme="dark"] .docs-sidebar-search::placeholder {
+  color: #8b949e;
+}
+
+[data-theme="dark"] .docs-sidebar-search:focus {
+  border-color: #58a6ff;
+  background: #0d1117;
+  box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.15);
+}
+
+[data-theme="dark"] .docs-sidebar-search-clear {
+  color: #8b949e;
+}
+
+[data-theme="dark"] .docs-sidebar-search-clear:hover {
+  color: #f0f6fc;
+  background: #30363d;
+}
+
+[data-theme="dark"] .docs-sidebar-no-results {
+  color: #8b949e;
+}
+
 [data-theme="light"] .docs-sidebar,
 [data-theme="light"] .docs-toc {
   border-color: #d0d7de;
@@ -561,6 +716,39 @@
 
 [data-theme="light"] .docs-page-nav-title {
   color: #1f2328;
+}
+
+[data-theme="light"] .docs-sidebar-search-icon {
+  color: #656d76;
+}
+
+[data-theme="light"] .docs-sidebar-search {
+  color: #1f2328;
+  background: #f6f8fa;
+  border-color: #d0d7de;
+}
+
+[data-theme="light"] .docs-sidebar-search::placeholder {
+  color: #656d76;
+}
+
+[data-theme="light"] .docs-sidebar-search:focus {
+  border-color: #0969da;
+  background: #ffffff;
+  box-shadow: 0 0 0 2px rgba(9, 105, 218, 0.15);
+}
+
+[data-theme="light"] .docs-sidebar-search-clear {
+  color: #656d76;
+}
+
+[data-theme="light"] .docs-sidebar-search-clear:hover {
+  color: #1f2328;
+  background: #d0d7de;
+}
+
+[data-theme="light"] .docs-sidebar-no-results {
+  color: #57606a;
 }
 
 @media (prefers-reduced-motion: reduce) {
