@@ -44,6 +44,19 @@
     return Array.prototype.slice.call(items);
   }
 
+  // fuzzyMatch checks whether every character of query appears in text
+  // in order, allowing arbitrary gaps between characters (fzf-style matching).
+  function fuzzyMatch(query, text) {
+    if (query === "") return true;
+    var qi = 0;
+    for (var ti = 0; ti < text.length && qi < query.length; ti++) {
+      if (text[ti] === query[qi]) {
+        qi++;
+      }
+    }
+    return qi === query.length;
+  }
+
   function filterArticles(query) {
     var articles = findArticles();
     var lowerQuery = query.toLowerCase().trim();
@@ -58,7 +71,7 @@
         continue;
       }
       var labelText = getLabelText(el).toLowerCase();
-      var matches = lowerQuery === "" || labelText.indexOf(lowerQuery) !== -1;
+      var matches = fuzzyMatch(lowerQuery, labelText);
       if (matches) hasMatch = true;
       if (matches) {
         el.classList.remove("docs-sidebar-article-hidden");
