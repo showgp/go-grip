@@ -55,6 +55,7 @@ Additional documentation browsing support:
 - The article sidebar sorts directories before files at each level, then sorts entries by name.
 - Recursive directory navigation is available with `-r` or `--recursive`, showing nested Markdown files as a collapsible tree.
 - Directory mode adds previous/next article navigation and supports the left/right arrow keys for moving between articles.
+- Sidebar search box: type to filter articles in real time. Directories auto-expand when they contain matching files. Press `Escape` to clear, or use `Ctrl+F` / `Cmd+F` to jump to the search box.
 
 Additional table-of-contents support:
 
@@ -99,6 +100,7 @@ Distribution changes:
 - Optional recursive directory sidebar with `-r`
 - Directory sidebar titles show the active directory name
 - Directory-first sidebar sorting for mixed folder/file lists
+- Sidebar search box to filter articles by filename in real time
 - Previous/next article links with left/right keyboard navigation
 - Per-page table of contents for rendered documents
 - Active table-of-contents highlighting while scrolling
@@ -247,7 +249,7 @@ go-grip -r docs
 go-grip --recursive docs
 ```
 
-The recursive sidebar is collapsible and keeps the active article visible while browsing nested documents. Previous/next navigation follows the same order as the sidebar, and the left/right arrow keys can move between articles when the page focus is not inside an editable field.
+The recursive sidebar is collapsible and keeps the active article visible while browsing nested documents. Use the search box above the sidebar to filter articles by filename — matching directories auto-expand, and a "No matching files" message appears when no results are found. Previous/next navigation follows the same order as the sidebar, and the left/right arrow keys can move between articles when the page focus is not inside an editable field.
 
 The browser will automatically open on http://localhost:6419. If that default port is already in use, go-grip will automatically try the next available port. You can disable opening the browser with the `-b=false` option.
 
