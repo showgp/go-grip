@@ -9,6 +9,7 @@
 	var DEBOUNCE_DELAY = 150;
 	var LARGE_DOC_THRESHOLD = 5000;
 	var isSyncingScroll = false;
+	var pendingImages = [];
 
 	function encodePath(path) {
 		return path.split("/").map(encodeURIComponent).join("/");
@@ -55,6 +56,37 @@
 		window.addEventListener("reload-changed", reloadChangedHandler);
 
 		restoreScrollPosition();
+
+		// Import Image 按钮
+		var importBtn = document.querySelector(".editor-btn-import");
+		if (importBtn) {
+			importBtn.addEventListener("click", function() {
+				openImportDialog();
+			});
+		}
+
+		// 对话框关闭按钮
+		document.querySelector(".import-dialog-close")?.addEventListener("click", closeImportDialog);
+		document.querySelector(".import-btn-cancel")?.addEventListener("click", closeImportDialog);
+
+		// Tab 切换
+		document.querySelectorAll(".import-tab").forEach(function(tab) {
+			tab.addEventListener("click", function() {
+				switchImportTab(this.dataset.tab);
+			});
+		});
+
+		// 确认按钮
+		document.querySelector(".import-btn-confirm")?.addEventListener("click", handleImportConfirm);
+
+		// Pending Tray 按钮
+		document.querySelector(".import-pending-insert-all")?.addEventListener("click", insertAllPending);
+		document.querySelector(".import-pending-close")?.addEventListener("click", clearPendingTray);
+
+		// 初始化和导入相关的交互
+		initDropzone();
+		initTextareaDrop();
+		initPasteHandler();
 	}
 
 	function enterEditMode() {
@@ -278,6 +310,10 @@
 		if (wrapper) wrapper.classList.remove("no-preview");
 		var previewBtn = document.querySelector(".editor-btn-eye");
 		if (previewBtn) previewBtn.classList.remove("active");
+
+		pendingImages = [];
+		var tray = document.querySelector(".import-pending-tray");
+		if (tray) tray.style.display = "none";
 	}
 
 	function checkExternalChanges() {
@@ -507,6 +543,632 @@
 			sessionStorage.removeItem("go-grip-scrollTop");
 		}
 	}
+
+// ===== Image Import Functions =====
+
+function openImportDialog() {
+  var overlay = document.querySelector(".import-dialog-overlay");
+  if (!overlay) return;
+  overlay.style.display = "";
+  resetDropzone();
+  switchImportTab("local");
+}
+
+function closeImportDialog() {
+  var overlay = document.querySelector(".import-dialog-overlay");
+  if (!overlay) return;
+  overlay.style.display = "none";
+  var input = document.querySelector(".import-file-input");
+  if (input) input.value = "";
+  document.querySelectorAll(".import-preview-item").forEach(function(item) {
+    if (item._objectUrl) URL.revokeObjectURL(item._objectUrl);
+  });
+}
+
+function resetDropzone() {
+  var list = document.querySelector(".import-preview-list");
+  if (list) { list.style.display = "none"; list.innerHTML = ""; }
+  var msg = document.querySelector(".import-dropzone-message");
+  if (msg) msg.style.display = "";
+}
+
+function switchImportTab(tabName) {
+  document.querySelectorAll(".import-tab").forEach(function(t) {
+    t.classList.toggle("active", t.dataset.tab === tabName);
+  });
+  document.querySelectorAll(".import-tab-content").forEach(function(tc) {
+    tc.classList.toggle("active", tc.dataset.tab === tabName);
+  });
+  var btn = document.querySelector(".import-btn-confirm");
+  if (btn) {
+    btn.textContent = tabName === "local" ? "Import" : "Insert";
+  }
+}
+
+function handleImportConfirm() {
+  var activeTab = document.querySelector(".import-tab.active");
+  if (!activeTab) return;
+
+  if (activeTab.dataset.tab === "url") {
+    var urlInput = document.querySelector(".import-url-input");
+    var url = urlInput ? urlInput.value.trim() : "";
+    if (!url) {
+      showToast("Please enter an image URL", "error");
+      return;
+    }
+    insertTextAtCursor("![](" + url + ")\n");
+    closeImportDialog();
+    return;
+  }
+
+  var previewItems = document.querySelectorAll(".import-preview-item");
+  if (previewItems.length === 0) {
+    showToast("No images selected", "error");
+    return;
+  }
+
+  var confirmBtn = this;
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = "Importing...";
+
+  var filesToImport = [];
+  previewItems.forEach(function(item) {
+    filesToImport.push({
+      file: item._file,
+      name: item._fileName
+    });
+  });
+
+  if (filesToImport.length === 1) {
+    var f = filesToImport[0];
+    importSingleFile(f.file, f.name, function(path) {
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = "Import";
+      if (path) {
+        closeImportDialog();
+        var textarea = document.querySelector(".editor-textarea");
+        if (textarea) {
+          var pos = textarea.selectionStart;
+          textarea.focus();
+          textarea.selectionStart = textarea.selectionEnd = pos;
+          insertTextAtCursor("![](" + encodeURI(path) + ")\n");
+        }
+      } else {
+        showToast("Import failed", "error");
+      }
+    });
+    return;
+  }
+
+  importAllFiles(filesToImport, function(successCount) {
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = "Import";
+    if (successCount > 0) {
+      closeImportDialog();
+    }
+  });
+}
+
+function importAllFiles(files, callback) {
+  var completed = 0;
+  var successCount = 0;
+  var total = files.length;
+  var pendingAdditions = [];
+
+  files.forEach(function(f) {
+    importSingleFile(f.file, f.name, function(path, fileObj) {
+      completed++;
+      if (path) {
+        successCount++;
+        pendingAdditions.push({
+          name: path.split("/").pop(),
+          path: path,
+          file: fileObj
+        });
+      }
+      if (completed === total) {
+        var readerCount = pendingAdditions.length;
+        if (readerCount === 0) {
+          if (callback) callback(successCount);
+          return;
+        }
+        pendingAdditions.forEach(function(item) {
+          var reader = new FileReader();
+          reader.onload = function(e) {
+            pendingImages.push({
+              name: item.name,
+              path: item.path,
+              dataUrl: e.target.result
+            });
+            readerCount--;
+            if (readerCount === 0) {
+              updatePendingTray();
+              if (callback) callback(successCount);
+            }
+          };
+          reader.readAsDataURL(item.file);
+        });
+      }
+    });
+  });
+}
+
+function importSingleFile(file, fileName, callback) {
+  var formData = new FormData();
+  formData.append("file", file, fileName);
+
+  var url = "/api/import?file=" + encodeURIComponent(currentFile);
+
+  fetch(url, {
+    method: "POST",
+    body: formData
+  })
+  .then(function(resp) {
+    if (!resp.ok) {
+      return resp.json().then(function(data) {
+        throw new Error(data.error || "Import failed");
+      });
+    }
+    return resp.json();
+  })
+  .then(function(data) {
+    callback(data.path, file);
+  })
+  .catch(function(err) {
+    showToast("Import failed: " + err.message, "error");
+    callback(null, null);
+  });
+}
+
+function updatePendingTray() {
+  var tray = document.querySelector(".import-pending-tray");
+  var list = document.querySelector(".import-pending-list");
+  var count = document.querySelector(".import-pending-count");
+  if (!tray || !list) return;
+
+  if (pendingImages.length === 0) {
+    tray.style.display = "none";
+    return;
+  }
+
+  tray.style.display = "";
+  if (count) count.textContent = "Pending images (" + pendingImages.length + ")";
+
+  list.innerHTML = "";
+  pendingImages.forEach(function(img, index) {
+    var item = document.createElement("div");
+    item.className = "import-pending-item";
+    item.title = img.name;
+
+    var imgEl = document.createElement("img");
+    imgEl.src = img.dataUrl;
+    imgEl.alt = img.name;
+    item.appendChild(imgEl);
+
+    var nameEl = document.createElement("div");
+    nameEl.className = "import-pending-item-name";
+    nameEl.textContent = img.name;
+    item.appendChild(nameEl);
+
+    item.addEventListener("click", function() {
+      insertImageAtIndex(index);
+    });
+
+    list.appendChild(item);
+  });
+}
+
+function insertImageAtIndex(index) {
+  if (index < 0 || index >= pendingImages.length) return;
+  var img = pendingImages[index];
+  insertTextAtCursor("![](" + encodeURI(img.path) + ")\n");
+  pendingImages.splice(index, 1);
+  updatePendingTray();
+}
+
+function insertAllPending() {
+  if (pendingImages.length === 0) return;
+  var text = pendingImages.map(function(img) {
+    return "![](" + encodeURI(img.path) + ")";
+  }).join("\n") + "\n";
+  insertTextAtCursor(text);
+  pendingImages = [];
+  updatePendingTray();
+}
+
+function clearPendingTray() {
+  pendingImages = [];
+  updatePendingTray();
+}
+
+function insertTextAtCursor(text) {
+  var textarea = document.querySelector(".editor-textarea");
+  if (!textarea) return;
+
+  var start = textarea.selectionStart;
+  var end = textarea.selectionEnd;
+
+  var before = textarea.value.substring(0, start);
+  var after = textarea.value.substring(end);
+
+  textarea.value = before + text + after;
+
+  var newPos = start + text.length;
+  textarea.setSelectionRange(newPos, newPos);
+  textarea.focus();
+
+  var event = new Event("input", { bubbles: true });
+  textarea.dispatchEvent(event);
+}
+
+/* --- Dropzone (initialized once) --- */
+
+var dropzoneInitialized = false;
+
+function initDropzone() {
+  if (dropzoneInitialized) return;
+  var dropzone = document.querySelector(".import-dropzone");
+  var fileInput = document.querySelector(".import-file-input");
+  if (!dropzone || !fileInput) return;
+  dropzoneInitialized = true;
+
+  dropzone.addEventListener("click", function(e) {
+    if (e.target.closest(".import-preview-item")) return;
+    fileInput.click();
+  });
+
+  fileInput.addEventListener("change", function() {
+    if (this.files && this.files.length > 0) {
+      handleFilesSelected(this.files);
+    }
+    this.value = "";
+  });
+
+  ["dragenter", "dragover"].forEach(function(event) {
+    dropzone.addEventListener(event, function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.classList.add("drag-over");
+    });
+  });
+
+  ["dragleave", "drop"].forEach(function(event) {
+    dropzone.addEventListener(event, function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dropzone.classList.remove("drag-over");
+    });
+  });
+
+  dropzone.addEventListener("drop", function(e) {
+    var items = e.dataTransfer.items;
+    if (items && items.length > 0) {
+      handleDroppedItems(items);
+    } else if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFilesSelected(e.dataTransfer.files);
+    }
+  });
+}
+
+/* --- Directory drag support (webkitGetAsEntry) --- */
+
+function handleDroppedItems(items) {
+  var allFiles = [];
+
+  function processEntry(entry, callback) {
+    if (entry.isFile) {
+      entry.file(function(file) {
+        allFiles.push(file);
+        callback();
+      }, callback);
+    } else if (entry.isDirectory) {
+      var reader = entry.createReader();
+      var MAX_DEPTH = 10;
+      readDirEntries(reader, function() {
+        callback();
+      });
+    } else {
+      callback();
+    }
+  }
+
+  function readDirEntries(reader, callback, depth) {
+    depth = depth || 0;
+    if (depth >= 10) { callback(); return; }
+    reader.readEntries(function(entries) {
+      if (entries.length === 0) {
+        callback();
+        return;
+      }
+      var pending = entries.length;
+      entries.forEach(function(entry) {
+        processEntry(entry, function() {
+          pending--;
+          if (pending === 0) {
+            readDirEntries(reader, callback, depth + 1);
+          }
+        });
+      });
+    }, callback);
+  }
+
+  var fileEntries = [];
+  for (var i = 0; i < items.length; i++) {
+    var entry = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
+    if (entry) {
+      fileEntries.push(entry);
+    }
+  }
+
+  if (fileEntries.length === 0) {
+    if (items.length > 0 && items[0].getAsFile) {
+      var files = [];
+      for (var i = 0; i < items.length; i++) {
+        var f = items[i].getAsFile();
+        if (f) files.push(f);
+      }
+      if (files.length > 0) handleFilesSelected(asFileList(files));
+    }
+    return;
+  }
+
+  var pending = fileEntries.length;
+  fileEntries.forEach(function(entry) {
+    processEntry(entry, function() {
+      pending--;
+      if (pending === 0) {
+        handleFilesSelected(asFileList(allFiles));
+      }
+    });
+  });
+}
+
+function asFileList(files) {
+  return {
+    length: files.length,
+    item: function(i) { return files[i]; }
+  };
+}
+
+/* --- File selection handling --- */
+
+function handleFilesSelected(fileList) {
+  var imageFiles = [];
+  for (var i = 0; i < fileList.length; i++) {
+    var file = fileList[i];
+    if (file.type && file.type.startsWith("image/")) {
+      imageFiles.push(file);
+    }
+  }
+
+  if (imageFiles.length === 0) {
+    showToast("No image files found", "error");
+    return;
+  }
+
+  showPreviewItems(imageFiles);
+}
+
+function showPreviewItems(files) {
+  var list = document.querySelector(".import-preview-list");
+  var msg = document.querySelector(".import-dropzone-message");
+  if (!list) return;
+
+  msg.style.display = "none";
+  list.style.display = "";
+  list.innerHTML = "";
+
+  files.forEach(function(file) {
+    var item = document.createElement("div");
+    item.className = "import-preview-item";
+
+    var img = document.createElement("img");
+    var objectUrl = URL.createObjectURL(file);
+    img.src = objectUrl;
+    item.appendChild(img);
+
+    var name = document.createElement("div");
+    name.className = "import-preview-item-name";
+    name.textContent = file.name;
+    item.appendChild(name);
+
+    item._file = file;
+    item._fileName = file.name;
+    item._objectUrl = objectUrl;
+
+    list.appendChild(item);
+  });
+}
+
+/* --- Textarea drag and drop --- */
+
+var textareaDropInitialized = false;
+
+function initTextareaDrop() {
+  if (textareaDropInitialized) return;
+  var textarea = document.querySelector(".editor-textarea");
+  if (!textarea) return;
+  textareaDropInitialized = true;
+
+  var dropOverlay = document.createElement("div");
+  dropOverlay.className = "textarea-drop-overlay";
+  dropOverlay.innerHTML = '<div class="textarea-drop-msg">Drop images to import</div>';
+  dropOverlay.style.display = "none";
+  textarea.parentNode.appendChild(dropOverlay);
+
+  ["dragenter", "dragover"].forEach(function(event) {
+    textarea.addEventListener(event, function(e) {
+      if (!e.dataTransfer.types || !Array.from(e.dataTransfer.types).includes("Files")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      dropOverlay.style.display = "";
+    });
+  });
+
+  ["dragleave", "drop"].forEach(function(event) {
+    textarea.addEventListener(event, function(e) {
+      dropOverlay.style.display = "none";
+    });
+  });
+
+  textarea.addEventListener("drop", function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+
+    var items = e.dataTransfer.items;
+    if (!items || items.length === 0) return;
+
+    if (items[0].webkitGetAsEntry) {
+      var allFiles = [];
+      var pending = items.length;
+
+      for (var i = 0; i < items.length; i++) {
+        var entry = items[i].webkitGetAsEntry();
+        if (!entry) { pending--; continue; }
+        collectFilesFromEntry(entry, allFiles, function() {
+          pending--;
+          if (pending === 0) {
+            processTextareaDropFiles(asFileList(allFiles));
+          }
+        });
+      }
+    } else {
+      processTextareaDropFiles(e.dataTransfer.files);
+    }
+  });
+}
+
+function collectFilesFromEntry(entry, result, callback) {
+  if (entry.isFile) {
+    entry.file(function(file) {
+      result.push(file);
+      callback();
+    }, callback);
+  } else if (entry.isDirectory) {
+    var reader = entry.createReader();
+    readDirEntriesFlat(reader, result, callback);
+  } else {
+    callback();
+  }
+}
+
+function readDirEntriesFlat(reader, result, callback, depth) {
+  depth = depth || 0;
+  if (depth >= 10) { callback(); return; }
+  reader.readEntries(function(entries) {
+    if (entries.length === 0) {
+      callback();
+      return;
+    }
+    var pending = entries.length;
+    entries.forEach(function(entry) {
+      collectFilesFromEntry(entry, result, function() {
+        pending--;
+        if (pending === 0) {
+          readDirEntriesFlat(reader, result, callback, depth + 1);
+        }
+      });
+    });
+  }, callback);
+}
+
+function processTextareaDropFiles(files) {
+  var imageFiles = [];
+  for (var i = 0; i < files.length; i++) {
+    var file = files.item ? files.item(i) : files[i];
+    if (file.type && file.type.startsWith("image/")) {
+      imageFiles.push(file);
+    }
+  }
+  if (imageFiles.length === 0) return;
+
+  var dropPos = document.querySelector(".editor-textarea").selectionStart;
+
+  if (imageFiles.length === 1) {
+    importSingleFile(imageFiles[0], imageFiles[0].name, function(path) {
+      if (path) {
+        var textarea = document.querySelector(".editor-textarea");
+        textarea.focus();
+        textarea.selectionStart = textarea.selectionEnd = dropPos;
+        insertTextAtCursor("![](" + encodeURI(path) + ")\n");
+      }
+    });
+  } else {
+    importAllFiles(imageFiles.map(function(f) {
+      return { file: f, name: f.name };
+    }), function() {});
+  }
+}
+
+/* --- Clipboard paste --- */
+
+var pasteHandlerInitialized = false;
+
+function initPasteHandler() {
+  if (pasteHandlerInitialized) return;
+  var textarea = document.querySelector(".editor-textarea");
+  if (!textarea) return;
+  pasteHandlerInitialized = true;
+
+  textarea.addEventListener("paste", function(e) {
+    var items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+
+    var imageItems = [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type && items[i].type.startsWith("image/")) {
+        imageItems.push(items[i]);
+      }
+    }
+
+    if (imageItems.length === 0) return;
+
+    e.preventDefault();
+
+    if (imageItems.length === 1) {
+      var item = imageItems[0];
+      var file = item.getAsFile();
+      if (!file) return;
+
+      var now = new Date();
+      var ts = now.getFullYear() +
+        String(now.getMonth() + 1).padStart(2, "0") +
+        String(now.getDate()).padStart(2, "0") + "_" +
+        String(now.getHours()).padStart(2, "0") +
+        String(now.getMinutes()).padStart(2, "0") +
+        String(now.getSeconds()).padStart(2, "0");
+      var fileName = file.name || "pasted_" + ts + ".png";
+
+      importSingleFile(file, fileName, function(path) {
+        if (path) {
+          var pos = textarea.selectionStart;
+          textarea.focus();
+          textarea.selectionStart = textarea.selectionEnd = pos;
+          insertTextAtCursor("![](" + encodeURI(path) + ")\n");
+        }
+      });
+    } else {
+      var files = [];
+      imageItems.forEach(function(item, idx) {
+        var f = item.getAsFile();
+        if (f) {
+          var now = new Date();
+          var ts = now.getFullYear() +
+            String(now.getMonth() + 1).padStart(2, "0") +
+            String(now.getDate()).padStart(2, "0") + "_" +
+            String(now.getHours()).padStart(2, "0") +
+            String(now.getMinutes()).padStart(2, "0") +
+            String(now.getSeconds()).padStart(2, "0");
+          var name = f.name || "pasted_" + ts + "_" + idx + ".png";
+          files.push({ file: f, name: name });
+        }
+      });
+      if (files.length > 0) {
+        importAllFiles(files, function() {});
+      }
+    }
+  });
+}
 
 	init();
 

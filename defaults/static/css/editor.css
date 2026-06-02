@@ -563,3 +563,437 @@
     display: none !important;
   }
 }
+
+/* === 3.1 Import Dialog Overlay === */
+.import-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 9997;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.import-dialog {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 520px;
+  max-width: 90vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.import-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2328;
+  border-bottom: 1px solid #d0d7de;
+}
+
+.import-dialog-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #656d76;
+  padding: 0;
+  line-height: 1;
+}
+
+.import-dialog-close:hover {
+  color: #1f2328;
+}
+
+.import-dialog-tabs {
+  display: flex;
+  border-bottom: 1px solid #d0d7de;
+  padding: 0 20px;
+}
+
+.import-tab {
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #656d76;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.import-tab:hover {
+  color: #1f2328;
+}
+
+.import-tab.active {
+  color: #0969da;
+  border-bottom-color: #0969da;
+}
+
+.import-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 20px;
+  border-top: 1px solid #d0d7de;
+}
+
+/* === 3.2 Tab Content & Dropzone === */
+.import-tab-content {
+  display: none;
+  padding: 20px;
+}
+
+.import-tab-content.active {
+  display: block;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.import-dropzone {
+  border: 2px dashed #d0d7de;
+  border-radius: 8px;
+  padding: 40px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.import-dropzone:hover,
+.import-dropzone.drag-over {
+  border-color: #0969da;
+  background-color: rgba(9, 105, 218, 0.05);
+}
+
+.import-dropzone-message svg {
+  color: #656d76;
+  margin-bottom: 8px;
+}
+
+.import-dropzone-message p {
+  margin: 0;
+  font-size: 14px;
+  color: #1f2328;
+}
+
+.import-dropzone-sub {
+  margin-top: 4px !important;
+  color: #656d76 !important;
+  font-size: 12px !important;
+}
+
+/* === 3.3 URL Tab === */
+.import-url-form {
+  padding: 20px 0;
+}
+
+.import-url-label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: #1f2328;
+  margin-bottom: 8px;
+}
+
+.import-url-input {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #1f2328;
+  background: #ffffff;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.import-url-input:focus {
+  border-color: #0969da;
+  box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.15);
+}
+
+/* === 3.4 Preview List === */
+.import-preview-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.import-preview-item {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.import-preview-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.import-preview-item-name {
+  font-size: 10px;
+  color: #656d76;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* === 3.5 Pending Tray === */
+.import-pending-tray {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 9995;
+  background: #ffffff;
+  border-top: 1px solid #d0d7de;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+  max-height: 120px;
+  display: flex;
+  flex-direction: column;
+}
+
+.import-pending-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 12px;
+  color: #656d76;
+}
+
+.import-pending-count {
+  flex: 1;
+}
+
+.import-pending-insert-all {
+  font-size: 12px !important;
+  padding: 2px 10px !important;
+}
+
+.import-pending-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: #656d76;
+  padding: 0 4px;
+}
+
+.import-pending-list {
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px;
+  overflow-x: auto;
+  flex: 1;
+  align-items: center;
+}
+
+.import-pending-item {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  transition: border-color 0.15s;
+}
+
+.import-pending-item:hover {
+  border-color: #0969da;
+}
+
+.import-pending-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.import-pending-item-name {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  font-size: 8px;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.5);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 2px;
+}
+
+/* === 3.6 Textarea Drop Overlay === */
+.textarea-drop-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(9, 105, 218, 0.1);
+  border: 2px dashed #0969da;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.textarea-drop-msg {
+  font-size: 16px;
+  font-weight: 500;
+  color: #0969da;
+  background: #ffffff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* === 3.7 Dark / Light Theme Overrides === */
+[data-theme="dark"] .import-dialog-overlay {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="dark"] .import-dialog {
+  background: #161b22;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .import-dialog-header {
+  color: #e6edf3;
+  border-bottom-color: #30363d;
+}
+
+[data-theme="dark"] .import-dialog-close {
+  color: #8b949e;
+}
+
+[data-theme="dark"] .import-dialog-close:hover {
+  color: #e6edf3;
+}
+
+[data-theme="dark"] .import-dialog-tabs {
+  border-bottom-color: #30363d;
+}
+
+[data-theme="dark"] .import-tab {
+  color: #8b949e;
+}
+
+[data-theme="dark"] .import-tab:hover {
+  color: #e6edf3;
+}
+
+[data-theme="dark"] .import-tab.active {
+  color: #58a6ff;
+  border-bottom-color: #58a6ff;
+}
+
+[data-theme="dark"] .import-dialog-footer {
+  border-top-color: #30363d;
+}
+
+[data-theme="dark"] .import-dropzone {
+  border-color: #30363d;
+}
+
+[data-theme="dark"] .import-dropzone:hover,
+[data-theme="dark"] .import-dropzone.drag-over {
+  border-color: #58a6ff;
+  background-color: rgba(88, 166, 255, 0.1);
+}
+
+[data-theme="dark"] .import-dropzone-message svg {
+  color: #8b949e;
+}
+
+[data-theme="dark"] .import-dropzone-message p {
+  color: #e6edf3;
+}
+
+[data-theme="dark"] .import-dropzone-sub {
+  color: #8b949e !important;
+}
+
+[data-theme="dark"] .import-url-label {
+  color: #e6edf3;
+}
+
+[data-theme="dark"] .import-url-input {
+  color: #e6edf3;
+  background: #0d1117;
+  border-color: #30363d;
+}
+
+[data-theme="dark"] .import-url-input:focus {
+  border-color: #58a6ff;
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+}
+
+[data-theme="dark"] .import-preview-item {
+  border-color: #30363d;
+}
+
+[data-theme="dark"] .import-preview-item-name {
+  color: #8b949e;
+}
+
+[data-theme="dark"] .import-pending-tray {
+  background: #161b22;
+  border-top-color: #30363d;
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .import-pending-header {
+  border-bottom-color: #21262d;
+  color: #8b949e;
+}
+
+[data-theme="dark"] .import-pending-close {
+  color: #8b949e;
+}
+
+[data-theme="dark"] .import-pending-item {
+  border-color: #30363d;
+}
+
+[data-theme="dark"] .import-pending-item:hover {
+  border-color: #58a6ff;
+}
+
+[data-theme="dark"] .textarea-drop-msg {
+  background: #161b22;
+  color: #58a6ff;
+}
+
+[data-theme="dark"] .textarea-drop-overlay {
+  background: rgba(88, 166, 255, 0.1);
+  border-color: #58a6ff;
+}
+
+[data-theme="light"] .import-dialog {
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}

@@ -143,6 +143,7 @@ func (s *Server) newHandlerForTarget(target serveTarget) http.Handler {
 	mux.HandleFunc("/api/raw/", s.handleRaw(dir))
 	mux.HandleFunc("/export", s.handleExport)
 	mux.HandleFunc("/pdf", s.handlePDF)
+	mux.HandleFunc("/api/import", s.handleImport)
 
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		requestFile := cleanRequestPath(r.URL.Path)
@@ -354,6 +355,65 @@ func (s *Server) handlePDF(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, strings.Replace(outName, ".html", ".pdf", 1)))
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(pdfBuf)
+}
+
+func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
+		return
+	}
+
+	fileParam := r.URL.Query().Get("file")
+	if fileParam == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing file parameter"})
+		return
+	}
+
+	dir := http.Dir(s.rootDir)
+	mdAbsPath, err := validateEditPath(dir, fileParam)
+	if err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		return
+	}
+
+	mdDir := filepath.Dir(mdAbsPath)
+	imagesDir := filepath.Join(mdDir, "images")
+
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid multipart form"})
+		return
+	}
+	defer func() { _ = r.MultipartForm.RemoveAll() }()
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing file in request"})
+		return
+	}
+	defer func() { _ = file.Close() }()
+
+	contentType := header.Header.Get("Content-Type")
+	if !isAllowedImageMIME(contentType) {
+		ext := strings.ToLower(filepath.Ext(header.Filename))
+		if !isAllowedImageExt(ext) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "only image files are allowed"})
+			return
+		}
+	}
+
+	data, err := io.ReadAll(file)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to read file"})
+		return
+	}
+
+	finalName, err := writeImageWithDedup(imagesDir, header.Filename, data)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "Failed to save file"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"path": "images/" + finalName})
 }
 
 func readToString(dir http.Dir, filename string) ([]byte, error) {
