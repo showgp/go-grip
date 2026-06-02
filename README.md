@@ -78,6 +78,7 @@ Additional editor support:
 - Scroll synchronization keeps the editor textarea and preview panel aligned by scroll percentage.
 - Custom `.md`-only file watcher (replaces `aarol/reload`) with WebSocket-based hot reload, exponential backoff reconnection, and debounced change events.
 - Keyboard shortcuts: `Ctrl+S` saves and reloads the browser, `Ctrl+Enter` saves and stays in the editor, `Ctrl+P` toggles the preview panel.
+- In-editor image import: click the **Import** button in the editor toolbar to open an import dialog. Drag & drop images or folders, use the file picker, paste from clipboard, or enter a URL. Single-image imports are inserted directly at the cursor; batch imports go to a pending tray for selective placement.
 
 Additional export support:
 
@@ -120,6 +121,7 @@ Distribution changes:
 - `Ctrl+S` save-and-reload, `Ctrl+Enter` save-and-stay, `Ctrl+P` toggle preview
 - Draggable split divider to resize editor/preview panels (persisted in sessionStorage)
 - Preview panel toggle button for distraction-free editing
+- In-editor image import: import images via drag-drop, file picker, clipboard paste, or URL. Single images insert directly at cursor; batches queue in a pending tray for selective placement. Images are copied to an `images/` subdirectory next to the edited file with automatic dedup and rename.
 - Custom `.md`-only file watcher with WebSocket hot-reload and exponential backoff reconnection
 - Debounced rendering (150ms default, scales to 300ms for 5000+ line documents)
 - **Export HTML**: download any rendered Markdown as a standalone HTML file (inline CSS, embedded images)
@@ -278,6 +280,7 @@ Use the toolbar buttons to:
 - **Save** — writes the content to disk and refreshes the browser preview.
 - **Cancel** / **Done** — exits edit mode; shows "Cancel" when there are unsaved changes and "Done" when the content matches the saved file.
 - **Preview** — toggles the preview panel on/off for distraction-free editing.
+- **Import** — opens the image import dialog. Drag & drop images or folders onto the dropzone, click to browse files, or switch to the URL tab to paste an external image link.
 - The split divider between editor and preview is draggable; the position is remembered across sessions.
 
 Keyboard shortcuts while editing:
@@ -288,6 +291,15 @@ Keyboard shortcuts while editing:
 | `Ctrl+Enter` | Save and stay in the editor |
 | `Ctrl+P` | Toggle preview panel |
 | `Esc` | Exit edit mode (same as Cancel/Done) |
+
+#### Importing images
+
+Click the **Import** button in the editor toolbar to open the image import dialog:
+
+- **Local File tab**: drag & drop images or a folder (subdirectories are scanned recursively), or click the dropzone to select files. All images are imported to an `images/` subdirectory next to the edited Markdown file. A single image can be inserted directly at the cursor; batch imports queue in a pending tray at the bottom of the editor. From the tray, click any thumbnail to insert it at the cursor, or use **Insert All** to place them all at once (one per line).
+- **URL tab**: paste an external image URL and click Insert to place `![](url)` at the cursor immediately.
+- **Drag & drop onto the textarea**: single images are imported and inserted directly at the drop position; multiple images or folders go to the pending tray.
+- **Clipboard paste**: pasting a screenshot or copied image from a file manager imports it automatically — single images are inserted directly, multiple images go to the pending tray.
 
 If the Markdown file changes on disk while the editor is open (e.g., by another program or `git pull`), go-grip detects the change and shows a dialog: **OK** reloads the latest content into the editor, **Cancel** keeps your edits and suppresses further prompts until the next save.
 
