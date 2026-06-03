@@ -20,7 +20,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25.x"
+          go-version: "1.26"
           check-latest: true
 
       - name: Run tests
@@ -80,5 +80,37 @@ jobs:
         with:
           files: dist/*
           generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos-app:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: Build GoGrip.app
+        run: |
+          xcodebuild -project macos/GoGrip.xcodeproj \
+            -scheme GoGrip -configuration Release \
+            CODE_SIGN_IDENTITY="" CODE_SIGNING_ALLOWED=NO \
+            archive -archivePath build/GoGrip.xcarchive
+
+      - name: Create DMG
+        run: |
+          mkdir -p dmg-root
+          cp -R build/GoGrip.xcarchive/Products/Applications/GoGrip.app dmg-root/
+          ln -s /Applications dmg-root/Applications
+          hdiutil create -volname "GoGrip" -srcfolder dmg-root \
+            -ov -format UDZO GoGrip.dmg
+
+      - name: Upload DMG
+        uses: softprops/action-gh-release@v2
+        with:
+          files: GoGrip.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

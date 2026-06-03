@@ -34,3 +34,17 @@ jobs:
         with:
           # v2.9+ built with Go 1.26; must stay aligned when Go version changes
           version: v2.12.2
+
+  macos:
+    if: github.event_name == 'pull_request'
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Swift App
+        run: |
+          xcodebuild -project macos/GoGrip.xcodeproj \
+            -scheme GoGrip -configuration Release \
+            CODE_SIGN_IDENTITY="" CODE_SIGNING_ALLOWED=NO \
+            build

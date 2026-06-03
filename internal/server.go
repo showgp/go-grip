@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html/template"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -33,10 +34,20 @@ type Server struct {
 	enableReload bool
 	strictPort   bool
 	recursive    bool
+	jsonOutput   bool
 	rootDir      string
+	rootDirMu    sync.RWMutex
+	listener     net.Listener
+	listenerMu   sync.RWMutex
 	pdfGenOnce   sync.Once
 	pdfGen       *PDFGenerator
 	pdfGenErr    error
+}
+
+type serverInfoJSON struct {
+	Port int    `json:"port"`
+	Host string `json:"host"`
+	URL  string `json:"url"`
 }
 
 type ServerOptions struct {
@@ -47,6 +58,7 @@ type ServerOptions struct {
 	EnableReload bool
 	StrictPort   bool
 	Recursive    bool
+	JSONOutput   bool
 	Parser       *Parser
 }
 
@@ -73,7 +85,16 @@ func NewServerWithOptions(opts ServerOptions) *Server {
 		enableReload: opts.EnableReload,
 		strictPort:   opts.StrictPort,
 		recursive:    opts.Recursive,
+		jsonOutput:   opts.JSONOutput,
 		parser:       opts.Parser,
+	}
+}
+
+func (s *Server) log(format string, args ...interface{}) {
+	if s.jsonOutput {
+		fmt.Fprintf(os.Stderr, format, args...)
+	} else {
+		fmt.Printf(format, args...)
 	}
 }
 
@@ -82,7 +103,9 @@ func (s *Server) Serve(file string) error {
 	if err != nil {
 		return err
 	}
+	s.rootDirMu.Lock()
 	s.rootDir = target.rootDir
+	s.rootDirMu.Unlock()
 
 	var reloadMiddleware *hotreload.Reloader
 	if s.enableReload {
@@ -96,15 +119,18 @@ func (s *Server) Serve(file string) error {
 
 	if s.enableReload {
 		handler = reloadMiddleware.Handle(handler)
-		fmt.Printf("📡 Auto-reload enabled. Only .md files will trigger browser refresh.\n")
+		s.log("📡 Auto-reload enabled. Only .md files will trigger browser refresh.\n")
 	} else {
-		fmt.Printf("🔄 Auto-reload disabled. Use F5 to manually refresh.\n")
+		s.log("🔄 Auto-reload disabled. Use F5 to manually refresh.\n")
 	}
 
 	listener, actualPort, err := listenOnPort(s.port, s.strictPort)
 	if err != nil {
 		return err
 	}
+	s.listenerMu.Lock()
+	s.listener = listener
+	s.listenerMu.Unlock()
 
 	initialPath, err := initialPathForTarget(target, s.recursive)
 	if err != nil {
@@ -112,20 +138,50 @@ func (s *Server) Serve(file string) error {
 		return err
 	}
 	addr := fmt.Sprintf("http://%s:%d%s", s.host, actualPort, initialPath)
-	fmt.Printf("🚀 Starting server: %s\n", addr)
+	s.log("🚀 Starting server: %s\n", addr)
+
+	if s.jsonOutput {
+		info := serverInfoJSON{
+			Port: actualPort,
+			Host: s.host,
+			URL:  addr,
+		}
+		jsonBytes, err := json.Marshal(info)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "failed to marshal JSON output: %v\n", err)
+			return err
+		}
+		fmt.Println(string(jsonBytes))
+		if err := os.Stdout.Sync(); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: stdout sync failed: %v\n", err)
+		}
+	}
 
 	if s.browser {
 		err := Open(addr)
 		if err != nil {
-			fmt.Println("❌ Error opening browser:", err)
+			s.log("❌ Error opening browser: %v\n", err)
 		}
 	}
 
 	return http.Serve(listener, handler)
 }
 
+// Stop gracefully shuts down the server by closing its listener.
+func (s *Server) Stop() error {
+	s.listenerMu.RLock()
+	l := s.listener
+	s.listenerMu.RUnlock()
+	if l != nil {
+		return l.Close()
+	}
+	return nil
+}
+
 func (s *Server) newHandler(dir http.Dir) http.Handler {
+	s.rootDirMu.Lock()
 	s.rootDir = string(dir)
+	s.rootDirMu.Unlock()
 	target := serveTarget{
 		mode:    modeDirectory,
 		rootDir: string(dir),
@@ -134,7 +190,9 @@ func (s *Server) newHandler(dir http.Dir) http.Handler {
 }
 
 func (s *Server) newHandlerForTarget(target serveTarget) http.Handler {
+	s.rootDirMu.Lock()
 	s.rootDir = target.rootDir
+	s.rootDirMu.Unlock()
 	dir := http.Dir(target.rootDir)
 	fileServer := http.FileServer(dir)
 	mux := http.NewServeMux()
@@ -272,10 +330,14 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dir := http.Dir(s.rootDir)
+	s.rootDirMu.RLock()
+	rootDir := s.rootDir
+	s.rootDirMu.RUnlock()
+
+	dir := http.Dir(rootDir)
 	bytes, err := readToString(dir, cleaned)
 	if err != nil {
-		http.Error(w, "file not found: "+fileParam, http.StatusNotFound)
+		http.Error(w, fmt.Sprintf("file not found: %s", fileParam), http.StatusNotFound)
 		return
 	}
 
@@ -285,7 +347,7 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	htmlContent, err := BuildExportHTML(template.HTML(rendered.Content), true, s.rootDir)
+	htmlContent, err := BuildExportHTML(template.HTML(rendered.Content), true, rootDir)
 	if err != nil {
 		http.Error(w, "export error: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -315,10 +377,14 @@ func (s *Server) handlePDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dir := http.Dir(s.rootDir)
+	s.rootDirMu.RLock()
+	rootDir := s.rootDir
+	s.rootDirMu.RUnlock()
+
+	dir := http.Dir(rootDir)
 	bytes, err := readToString(dir, cleaned)
 	if err != nil {
-		http.Error(w, "file not found: "+fileParam, http.StatusNotFound)
+		http.Error(w, fmt.Sprintf("file not found: %s", fileParam), http.StatusNotFound)
 		return
 	}
 
@@ -329,7 +395,7 @@ func (s *Server) handlePDF(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build PDF-optimized HTML
-	htmlContent, err := buildPDFMarkup(template.HTML(rendered.Content), s.rootDir)
+	htmlContent, err := buildPDFMarkup(template.HTML(rendered.Content), rootDir)
 	if err != nil {
 		http.Error(w, "PDF markup error: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -369,7 +435,11 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dir := http.Dir(s.rootDir)
+	s.rootDirMu.RLock()
+	rootDir := s.rootDir
+	s.rootDirMu.RUnlock()
+
+	dir := http.Dir(rootDir)
 	mdAbsPath, err := validateEditPath(dir, fileParam)
 	if err != nil {
 		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})

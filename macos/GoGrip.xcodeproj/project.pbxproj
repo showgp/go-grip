@@ -1,0 +1,379 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		1027A4D1C09A90A42DAC4E77 /* PopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60382E34A2F1723AF0CB5E3B /* PopoverView.swift */; };
+		195E1534C2C5F6286D2FAC29 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 271A5F2B6364A10D897B29A4 /* SettingsView.swift */; };
+		5D774EABF25C6380835C48A5 /* Storage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5526CF1E7DA86939577F8D4 /* Storage.swift */; };
+		726B80273CCA2791F1DE7F31 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 688840181AFE63A37BAD11A1 /* AppDelegate.swift */; };
+		90A8A4B575DAFD2276969B99 /* ProcessManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A1675E1F2CF7A31CC1EDB35 /* ProcessManager.swift */; };
+		B2344C30B0125449DB9D680C /* GoGripApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7C1436416AC824A65869FF4 /* GoGripApp.swift */; };
+		B3E6D602B743B8C5A2EE569B /* HistoryRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E5266519267DB737E65D59E /* HistoryRowView.swift */; };
+		B5F2C207410D975EE8E4E39C /* HistoryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35437A03FF5E2489C30FDDBB /* HistoryListView.swift */; };
+		C30A75EC589709605462460C /* DropOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3B0940555132D7A4FD5C41D /* DropOverlayView.swift */; };
+		CF87A9EB81C929A3DFF16813 /* HistoryEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2777745FD028D3C073B12BB2 /* HistoryEntry.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		271A5F2B6364A10D897B29A4 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		2777745FD028D3C073B12BB2 /* HistoryEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryEntry.swift; sourceTree = "<group>"; };
+		35437A03FF5E2489C30FDDBB /* HistoryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryListView.swift; sourceTree = "<group>"; };
+		4A1675E1F2CF7A31CC1EDB35 /* ProcessManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessManager.swift; sourceTree = "<group>"; };
+		60382E34A2F1723AF0CB5E3B /* PopoverView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PopoverView.swift; sourceTree = "<group>"; };
+		688840181AFE63A37BAD11A1 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		85895AC046F28E5D9BA1160B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		9E5266519267DB737E65D59E /* HistoryRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryRowView.swift; sourceTree = "<group>"; };
+		B7C19184BEE39277C0A42987 /* GoGrip.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GoGrip.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D3B0940555132D7A4FD5C41D /* DropOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropOverlayView.swift; sourceTree = "<group>"; };
+		D7C1436416AC824A65869FF4 /* GoGripApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoGripApp.swift; sourceTree = "<group>"; };
+		F5526CF1E7DA86939577F8D4 /* Storage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Storage.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		0A06136125108D862DB9CE34 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				D3B0940555132D7A4FD5C41D /* DropOverlayView.swift */,
+				35437A03FF5E2489C30FDDBB /* HistoryListView.swift */,
+				9E5266519267DB737E65D59E /* HistoryRowView.swift */,
+				60382E34A2F1723AF0CB5E3B /* PopoverView.swift */,
+				271A5F2B6364A10D897B29A4 /* SettingsView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		321D6ACBC5CFD49DE7284B08 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				2777745FD028D3C073B12BB2 /* HistoryEntry.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		63DC20E08AAC5BDF43EEB23F /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B7C19184BEE39277C0A42987 /* GoGrip.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C3D0FB6AAB575194E46EFBEC /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				4A1675E1F2CF7A31CC1EDB35 /* ProcessManager.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		CE0328FC9DAB32ADD2196373 /* GoGrip */ = {
+			isa = PBXGroup;
+			children = (
+				688840181AFE63A37BAD11A1 /* AppDelegate.swift */,
+				D7C1436416AC824A65869FF4 /* GoGripApp.swift */,
+				85895AC046F28E5D9BA1160B /* Info.plist */,
+				321D6ACBC5CFD49DE7284B08 /* Models */,
+				C3D0FB6AAB575194E46EFBEC /* Services */,
+				DBCA1590C6FD9268F24CD635 /* Utilities */,
+				0A06136125108D862DB9CE34 /* Views */,
+			);
+			path = GoGrip;
+			sourceTree = "<group>";
+		};
+		DBCA1590C6FD9268F24CD635 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				F5526CF1E7DA86939577F8D4 /* Storage.swift */,
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
+		EE9AED2B29298AC1F6CD559D = {
+			isa = PBXGroup;
+			children = (
+				CE0328FC9DAB32ADD2196373 /* GoGrip */,
+				63DC20E08AAC5BDF43EEB23F /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		91CCEAA3A0A0B6EAED3C9E8A /* GoGrip */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 326EADACC254E5F05C327A17 /* Build configuration list for PBXNativeTarget "GoGrip" */;
+			buildPhases = (
+				AD0FB927170FEB0CD10BBF4F /* Build go-grip */,
+				D410ED4C0908679CEA74B15E /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = GoGrip;
+			packageProductDependencies = (
+			);
+			productName = GoGrip;
+			productReference = B7C19184BEE39277C0A42987 /* GoGrip.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		1F13F52903503B9DC2A85F8B /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = A8ECC4395F36BB7A7A622A76 /* Build configuration list for PBXProject "GoGrip" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = EE9AED2B29298AC1F6CD559D;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 63DC20E08AAC5BDF43EEB23F /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				91CCEAA3A0A0B6EAED3C9E8A /* GoGrip */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		AD0FB927170FEB0CD10BBF4F /* Build go-grip */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build go-grip";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -euo pipefail\n\"${SRCROOT}/Scripts/build-go-grip.sh\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D410ED4C0908679CEA74B15E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				726B80273CCA2791F1DE7F31 /* AppDelegate.swift in Sources */,
+				C30A75EC589709605462460C /* DropOverlayView.swift in Sources */,
+				B2344C30B0125449DB9D680C /* GoGripApp.swift in Sources */,
+				CF87A9EB81C929A3DFF16813 /* HistoryEntry.swift in Sources */,
+				B5F2C207410D975EE8E4E39C /* HistoryListView.swift in Sources */,
+				B3E6D602B743B8C5A2EE569B /* HistoryRowView.swift in Sources */,
+				1027A4D1C09A90A42DAC4E77 /* PopoverView.swift in Sources */,
+				90A8A4B575DAFD2276969B99 /* ProcessManager.swift in Sources */,
+				195E1534C2C5F6286D2FAC29 /* SettingsView.swift in Sources */,
+				5D774EABF25C6380835C48A5 /* Storage.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		2617EC052617383AEFCCCBC5 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		87557591094664F167C321F4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = GoGrip/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.showgp.GoGrip;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		A0C18671D0BF76A3A1A15981 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		ACEF9BF41B3403A34696B8CC /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = GoGrip/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.showgp.GoGrip;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		326EADACC254E5F05C327A17 /* Build configuration list for PBXNativeTarget "GoGrip" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				87557591094664F167C321F4 /* Debug */,
+				ACEF9BF41B3403A34696B8CC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		A8ECC4395F36BB7A7A622A76 /* Build configuration list for PBXProject "GoGrip" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				2617EC052617383AEFCCCBC5 /* Debug */,
+				A0C18671D0BF76A3A1A15981 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 1F13F52903503B9DC2A85F8B /* Project object */;
+}

@@ -65,6 +65,7 @@ var rootCmd = &cobra.Command{
 		boundingBox, _ := cmd.Flags().GetBool("bounding-box")
 		noReload, _ := cmd.Flags().GetBool("no-reload")
 		recursive, _ := cmd.Flags().GetBool("recursive")
+		jsonOutput, _ := cmd.Flags().GetBool("json")
 
 		var file string
 		if len(args) == 1 {
@@ -80,6 +81,7 @@ var rootCmd = &cobra.Command{
 			EnableReload: !noReload,
 			StrictPort:   cmd.Flags().Changed("port"),
 			Recursive:    recursive,
+			JSONOutput:   jsonOutput,
 			Parser:       parser,
 		})
 		return server.Serve(file)
@@ -102,4 +104,5 @@ func init() {
 	rootCmd.Flags().BoolP("recursive", "r", false, "Include nested Markdown files in directory sidebar")
 	rootCmd.Flags().String("export", "", "Export a Markdown file as standalone HTML and exit")
 	rootCmd.Flags().String("output", "", "Output file path (used with --export; default: stdout)")
+	rootCmd.Flags().Bool("json", false, "Output server info as JSON to stdout on startup")
 }

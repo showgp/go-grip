@@ -1,0 +1,26 @@
+name: GoGrip
+options:
+  bundleIdPrefix: com.showgp
+  deploymentTarget:
+    macOS: "13.0"
+  xcodeVersion: "16.0"
+targets:
+  GoGrip:
+    type: application
+    platform: macOS
+    sources:
+      - GoGrip
+    info:
+      path: GoGrip/Info.plist
+    prebuildScripts:
+      - name: Build go-grip
+        script: |
+          set -euo pipefail
+          "${SRCROOT}/Scripts/build-go-grip.sh"
+        basedOnDependencyAnalysis: false
+    settings:
+      base:
+        CODE_SIGN_IDENTITY: ""
+        CODE_SIGNING_ALLOWED: NO
+        ENABLE_HARDENED_RUNTIME: NO
+        SWIFT_VERSION: "5.0"

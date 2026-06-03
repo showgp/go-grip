@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -276,5 +278,129 @@ func TestExportRouteDirectoryTraversal(t *testing.T) {
 
 	if recorder.Code != http.StatusBadRequest {
 		t.Fatalf("expected status %d for directory traversal attempt, got %d", http.StatusBadRequest, recorder.Code)
+	}
+}
+
+func TestServeJSONOutput(t *testing.T) {
+	t.Parallel()
+
+	tmpDir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmpDir, "README.md"), []byte("# Hello\n"), 0o644); err != nil {
+		t.Fatalf("write README.md: %v", err)
+	}
+
+	// Capture stdout and stderr
+	origStdout := os.Stdout
+	origStderr := os.Stderr
+	outR, outW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("create stdout pipe: %v", err)
+	}
+	errR, errW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("create stderr pipe: %v", err)
+	}
+	os.Stdout = outW
+	os.Stderr = errW
+	defer func() {
+		os.Stdout = origStdout
+		os.Stderr = origStderr
+	}()
+
+	server := NewServerWithOptions(ServerOptions{
+		Host:       "127.0.0.1",
+		Port:       0,
+		Browser:    false,
+		JSONOutput: true,
+		Parser:     NewParser(),
+	})
+
+	// Serve in a goroutine since it blocks
+	done := make(chan error, 1)
+	go func() {
+		done <- server.Serve(filepath.Join(tmpDir, "README.md"))
+	}()
+
+	// Read stdout/stderr in background goroutines
+	stdoutCh := make(chan []byte, 1)
+	go func() {
+		data, _ := io.ReadAll(outR)
+		stdoutCh <- data
+	}()
+	stderrCh := make(chan []byte, 1)
+	go func() {
+		data, _ := io.ReadAll(errR)
+		stderrCh <- data
+	}()
+
+	// Close write ends to signal readers after a short delay
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		outW.Close()
+		errW.Close()
+	}()
+
+	// Wait for stdout with timeout
+	var stdoutBytes []byte
+	select {
+	case stdoutBytes = <-stdoutCh:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for stdout")
+	}
+
+	// Wait for stderr with timeout
+	var stderrBytes []byte
+	select {
+	case stderrBytes = <-stderrCh:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timeout waiting for stderr")
+	}
+
+	// Verify stdout contains valid JSON with "port" key
+	stdoutStr := strings.TrimSpace(string(stdoutBytes))
+	if stdoutStr == "" {
+		t.Fatal("expected JSON output on stdout, got empty")
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal([]byte(stdoutStr), &result); err != nil {
+		t.Fatalf("expected valid JSON on stdout, got error: %v\nraw: %q", err, stdoutStr)
+	}
+
+	portVal, ok := result["port"].(float64)
+	if !ok {
+		t.Fatalf("expected port to be a JSON number, got type %T: %v", result["port"], result)
+	}
+	if int(portVal) <= 0 {
+		t.Fatalf("expected port to be positive, got %v", portVal)
+	}
+	if _, ok := result["host"]; !ok {
+		t.Fatalf("expected JSON to contain 'host' key, got: %v", result)
+	}
+	if _, ok := result["url"]; !ok {
+		t.Fatalf("expected JSON to contain 'url' key, got: %v", result)
+	}
+
+	// Verify stderr contains status messages
+	stderrStr := string(stderrBytes)
+	if !strings.Contains(stderrStr, "Starting server") && !strings.Contains(stderrStr, "Auto-reload") {
+		t.Fatalf("expected stderr to contain status messages, got: %q", stderrStr)
+	}
+
+	// Stop the server
+	_ = server.Stop()
+}
+
+func TestStopWithoutServe(t *testing.T) {
+	t.Parallel()
+
+	server := NewServerWithOptions(ServerOptions{
+		Host: "localhost",
+		Port: 6419,
+	})
+	// Should not panic or error when Stop() called without Serve()
+	err := server.Stop()
+	if err != nil {
+		t.Fatalf("expected no error from Stop() without Serve(), got: %v", err)
 	}
 }
