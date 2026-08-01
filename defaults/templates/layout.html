@@ -328,7 +328,7 @@
     {{end}}
   <script>
     document.getElementById('export-html')?.addEventListener('click', async function() {
-      const currentPath = window.location.pathname;
+      const currentPath = decodeURIComponent(window.location.pathname);
       if (!currentPath.endsWith('.md')) return;
       try {
         const resp = await fetch('/export?file=' + encodeURIComponent(currentPath.replace(/^\//, '')));
@@ -347,7 +347,7 @@
       }
     });
     document.getElementById('export-pdf')?.addEventListener('click', async function() {
-      const currentPath = window.location.pathname;
+      const currentPath = decodeURIComponent(window.location.pathname);
       if (!currentPath.endsWith('.md') || this.disabled) return;
       this.disabled = true;
       this.classList.add('loading');
