@@ -1,0 +1,3 @@
+# Distribute a persistent menu bar app
+
+The macOS host will run as a persistent `LSUIElement` menu bar app without a Dock presence and will be distributed directly as a Developer ID-signed, notarized universal application for macOS 13 and later. This keeps Finder commands, recent targets, and preview-session ownership in one stable process while avoiding Mac App Store sandbox constraints; unsigned local builds remain a development concern, not the release experience. A release artifact must pass tests, signature and notarization validation, and a clean-install smoke test from the final DMG before publication.
