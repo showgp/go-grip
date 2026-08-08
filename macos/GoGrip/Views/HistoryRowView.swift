@@ -63,17 +63,11 @@ private struct ReliableHoverModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(
-                GeometryReader { proxy in
-                    Representable(
-                        frame: proxy.frame(in: .global),
-                        onHover: onHover
-                    )
-                }
+                Representable(onHover: onHover)
             )
     }
 
     private struct Representable: NSViewRepresentable {
-        let frame: NSRect
         let onHover: (Bool) -> Void
 
         func makeCoordinator() -> Coordinator {
@@ -118,6 +112,14 @@ private struct ReliableHoverModifier: ViewModifier {
             var coordinator: Coordinator?
 
             override var acceptsFirstResponder: Bool { false }
+
+            /// Prevent this transparent NSView from participating in hit testing.
+            /// Without this, the view can intercept clicks in NSPopover + NSHostingController
+            /// contexts, causing the click to resolve to the wrong row's onTapGesture
+            /// due to coordinate system offsets in the AppKit responder chain.
+            override func hitTest(_ point: NSPoint) -> NSView? {
+                nil
+            }
 
             override func mouseEntered(with event: NSEvent) {
                 coordinator?.onHover(true)

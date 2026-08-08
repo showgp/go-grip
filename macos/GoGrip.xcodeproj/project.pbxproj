@@ -17,9 +17,36 @@
 		B5F2C207410D975EE8E4E39C /* HistoryListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 35437A03FF5E2489C30FDDBB /* HistoryListView.swift */; };
 		C30A75EC589709605462460C /* DropOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3B0940555132D7A4FD5C41D /* DropOverlayView.swift */; };
 		CF87A9EB81C929A3DFF16813 /* HistoryEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2777745FD028D3C073B12BB2 /* HistoryEntry.swift */; };
+		D98B2BD343EF01B15A635A01 /* FinderSync.swift in Sources */ = {isa = PBXBuildFile; fileRef = E30E60355BFA02DD41BC821C /* FinderSync.swift */; };
+		E142D88C84F70DF802C4B579 /* GoGripFinderSync.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = B2ABADB9E055BA6457745841 /* GoGripFinderSync.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		5468E1F37F710DF5874586AF /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1F13F52903503B9DC2A85F8B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7B763C6F54B0E0F7C419D213;
+			remoteInfo = GoGripFinderSync;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		5172F5DBAC9F94EC91664FFD /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				E142D88C84F70DF802C4B579 /* GoGripFinderSync.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		12D6792AD00EDE0FC87A2E40 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		271A5F2B6364A10D897B29A4 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		2777745FD028D3C073B12BB2 /* HistoryEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryEntry.swift; sourceTree = "<group>"; };
 		35437A03FF5E2489C30FDDBB /* HistoryListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryListView.swift; sourceTree = "<group>"; };
@@ -28,9 +55,12 @@
 		688840181AFE63A37BAD11A1 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		85895AC046F28E5D9BA1160B /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		9E5266519267DB737E65D59E /* HistoryRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryRowView.swift; sourceTree = "<group>"; };
+		A3DB14B0047D1EFC0AAF1C42 /* GoGripFinderSync.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = GoGripFinderSync.entitlements; sourceTree = "<group>"; };
+		B2ABADB9E055BA6457745841 /* GoGripFinderSync.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = GoGripFinderSync.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B7C19184BEE39277C0A42987 /* GoGrip.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = GoGrip.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D3B0940555132D7A4FD5C41D /* DropOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DropOverlayView.swift; sourceTree = "<group>"; };
 		D7C1436416AC824A65869FF4 /* GoGripApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoGripApp.swift; sourceTree = "<group>"; };
+		E30E60355BFA02DD41BC821C /* FinderSync.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinderSync.swift; sourceTree = "<group>"; };
 		F5526CF1E7DA86939577F8D4 /* Storage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Storage.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -47,6 +77,16 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
+		2C198F125C9D388B830BDAF7 /* GoGripFinderSync */ = {
+			isa = PBXGroup;
+			children = (
+				E30E60355BFA02DD41BC821C /* FinderSync.swift */,
+				A3DB14B0047D1EFC0AAF1C42 /* GoGripFinderSync.entitlements */,
+				12D6792AD00EDE0FC87A2E40 /* Info.plist */,
+			);
+			path = GoGripFinderSync;
+			sourceTree = "<group>";
+		};
 		321D6ACBC5CFD49DE7284B08 /* Models */ = {
 			isa = PBXGroup;
 			children = (
@@ -59,6 +99,7 @@
 			isa = PBXGroup;
 			children = (
 				B7C19184BEE39277C0A42987 /* GoGrip.app */,
+				B2ABADB9E055BA6457745841 /* GoGripFinderSync.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -97,6 +138,7 @@
 			isa = PBXGroup;
 			children = (
 				CE0328FC9DAB32ADD2196373 /* GoGrip */,
+				2C198F125C9D388B830BDAF7 /* GoGripFinderSync */,
 				63DC20E08AAC5BDF43EEB23F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -104,16 +146,35 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		7B763C6F54B0E0F7C419D213 /* GoGripFinderSync */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7BB95E8E12CA9F60C6539A4E /* Build configuration list for PBXNativeTarget "GoGripFinderSync" */;
+			buildPhases = (
+				C8B64604ED314F1567435C4A /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = GoGripFinderSync;
+			packageProductDependencies = (
+			);
+			productName = GoGripFinderSync;
+			productReference = B2ABADB9E055BA6457745841 /* GoGripFinderSync.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		91CCEAA3A0A0B6EAED3C9E8A /* GoGrip */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 326EADACC254E5F05C327A17 /* Build configuration list for PBXNativeTarget "GoGrip" */;
 			buildPhases = (
 				AD0FB927170FEB0CD10BBF4F /* Build go-grip */,
 				D410ED4C0908679CEA74B15E /* Sources */,
+				5172F5DBAC9F94EC91664FFD /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				1A4C06B3CF63A4677D1E3B3D /* PBXTargetDependency */,
 			);
 			name = GoGrip;
 			packageProductDependencies = (
@@ -148,6 +209,7 @@
 			projectRoot = "";
 			targets = (
 				91CCEAA3A0A0B6EAED3C9E8A /* GoGrip */,
+				7B763C6F54B0E0F7C419D213 /* GoGripFinderSync */,
 			);
 		};
 /* End PBXProject section */
@@ -175,6 +237,14 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		C8B64604ED314F1567435C4A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D98B2BD343EF01B15A635A01 /* FinderSync.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		D410ED4C0908679CEA74B15E /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -193,6 +263,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		1A4C06B3CF63A4677D1E3B3D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7B763C6F54B0E0F7C419D213 /* GoGripFinderSync */;
+			targetProxy = 5468E1F37F710DF5874586AF /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		2617EC052617383AEFCCCBC5 /* Debug */ = {
@@ -254,6 +332,48 @@
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		28DFDF2EC1F968A7850EE903 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_ENTITLEMENTS = GoGripFinderSync/GoGripFinderSync.entitlements;
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = GoGripFinderSync/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.showgp.GoGripFinderSync;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		5C2375AC76E0BF8D99B64B47 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_ENTITLEMENTS = GoGripFinderSync/GoGripFinderSync.entitlements;
+				CODE_SIGN_IDENTITY = "";
+				COMBINE_HIDPI_IMAGES = YES;
+				ENABLE_HARDENED_RUNTIME = NO;
+				INFOPLIST_FILE = GoGripFinderSync/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.showgp.GoGripFinderSync;
+				SDKROOT = macosx;
+				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -360,6 +480,15 @@
 			buildConfigurations = (
 				87557591094664F167C321F4 /* Debug */,
 				ACEF9BF41B3403A34696B8CC /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		7BB95E8E12CA9F60C6539A4E /* Build configuration list for PBXNativeTarget "GoGripFinderSync" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5C2375AC76E0BF8D99B64B47 /* Debug */,
+				28DFDF2EC1F968A7850EE903 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

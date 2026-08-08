@@ -14,6 +14,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupStatusItem()
         setupPopover()
         setupBadgeObserver()
+
+        NSApp.servicesProvider = self
+        NSUpdateDynamicServices()
     }
 
     private func setupStatusItem() {
@@ -58,6 +61,54 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         processManager.stopAll()
+    }
+
+    // MARK: - Services
+
+    @objc func openWithGoGrip(
+        _ pboard: NSPasteboard,
+        userData: String,
+        error: AutoreleasingUnsafeMutablePointer<NSString>
+    ) {
+        guard let urls = pboard.readObjects(forClasses: [NSURL.self], options: [
+            .urlReadingFileURLsOnly: true
+        ]) as? [URL], let url = urls.first else {
+            error.pointee = "No file URL provided" as NSString
+            return
+        }
+
+        let path = url.path
+        openPath(path)
+    }
+
+    // MARK: - URL Scheme Handler
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            guard url.scheme == "gogrip" else { continue }
+            guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+                  let pathItem = components.queryItems?.first(where: { $0.name == "path" }),
+                  let path = pathItem.value else { continue }
+
+            openPath(path)
+        }
+    }
+
+    // MARK: - Path Validation & Opening
+
+    private func openPath(_ path: String) {
+        var isDir: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: path, isDirectory: &isDir)
+        let isMarkdown = path.hasSuffix(".md")
+        guard exists, isDir.boolValue || isMarkdown else { return }
+
+        Task {
+            await processManager.start(path: path)
+            if let port = processManager.port(for: path),
+               let url = URL(string: "http://localhost:\(port)") {
+                await MainActor.run { NSWorkspace.shared.open(url) }
+            }
+        }
     }
 
     @objc func togglePopover(_ sender: AnyObject?) {
