@@ -3,3 +3,6 @@ result
 bin
 .codewhale
 .deepseek
+/go-grip
+.DS_Store
+xcuserdata/
