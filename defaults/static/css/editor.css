@@ -343,9 +343,15 @@
 [data-editing="true"] .docs-main .container {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 20px);
+  height: 100vh;
   overflow: hidden;
-  max-width: min(80vw, 1400px);
+  max-width: none;
+}
+
+@supports (height: 100dvh) {
+  [data-editing="true"] .docs-main .container {
+    height: 100dvh;
+  }
 }
 
 /* container-inner wraps toolbar + editor in edit mode; must pass flex height */
@@ -354,6 +360,8 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  padding: 0;
+  margin-bottom: 0;
 }
 
 [data-editing="true"] .editor-container {
@@ -361,6 +369,7 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
+  margin-bottom: 0;
 }
 
 [data-editing="true"] .editor-textarea {
@@ -425,6 +434,32 @@
   resize: vertical;
   border-top-right-radius: 6px;
   border-bottom-right-radius: 6px;
+}
+
+/* Keep preview content at a comfortable reading width inside the wide pane */
+[data-editing="true"] .editor-split-preview > * {
+  max-width: 896px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Editor toolbar stays pinned to the top while editing */
+[data-editing="true"] .editor-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  padding: 8px 16px;
+  background: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-editing="true"] .editor-toolbar {
+    background: #0d1117;
+  }
+}
+
+[data-editing="true"][data-theme="dark"] .editor-toolbar {
+  background: #0d1117;
 }
 
 .editor-btn-eye {
@@ -551,6 +586,9 @@
 
 [data-editing="true"] .docs-shell {
   display: block;
+  max-width: none;
+  margin: 0;
+  padding: 0;
 }
 
 [data-editing="true"] .docs-main {
