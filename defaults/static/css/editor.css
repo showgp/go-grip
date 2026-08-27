@@ -443,6 +443,11 @@
   margin-right: auto;
 }
 
+/* Wide tables scroll inside the preview instead of being clipped */
+[data-editing="true"] .editor-split-preview table {
+  max-width: min(100%, 896px);
+}
+
 /* Editor toolbar stays pinned to the top while editing */
 [data-editing="true"] .editor-toolbar {
   position: sticky;
