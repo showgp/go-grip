@@ -40,7 +40,9 @@ go-grip/
 │   ├── pdf.go                  # PDF 生成：chromedp 无头 Chrome、打印模板
 │   ├── pdf_test.go
 │   └── hotreload/
-│       └── hotreload.go        # 文件监控 + WebSocket 热重载中间件
+│       ├── hotreload.go        # 文件监控 + WebSocket 热重载中间件
+│       ├── fd_unix.go          # EMFILE/ENFILE 判定
+│       └── fd_other.go         # 非 unix 平台的空实现
 ├── pkg/
 │   ├── alert/                  # > [!NOTE/TIP/IMPORTANT/WARNING/CAUTION] 区块
 │   ├── details/                # <details> 折叠状态持久化 (sessionStorage)
@@ -85,7 +87,7 @@ main.go: main()
            │   └─ 保存 host, port, boundingBox, browser, enableReload, strictPort, recursive, parser
            └─ server.Serve(file)
                ├─ internal.resolveServeTarget(file)  // 判定单文件/目录模式
-               ├─ hotreload.New(rootDir)             // (若 enableReload) 启动 fsnotify 监控
+               ├─ hotreload.New(rootDir, recursive)   // (若 enableReload) 启动 fsnotify 监控
                ├─ handler = s.newHandlerForTarget(target)
                │   └─ 注册路由:
                │       /static/*          → defaults.StaticFiles (embed.FS)
@@ -236,16 +238,28 @@ Markdown 原始文本 ([]byte)
 | | `CssMathJax template.CSS` | MathJax CSS |
 | `PDFGenerator` | (chromedp 上下文管理) | 无头 Chrome 实例池 |
 
-### 5.8 热重载 (`internal/hotreload/hotreload.go`)
+### 5.8 热重载 (`internal/hotreload/`)
 
 | 类型 | 字段 | 说明 |
 |---|---|---|
 | `Reloader` | `rootDir string` | 监控根目录 |
+| | `recursive bool` | 是否递归（对齐 `--recursive`，非递归时只监听根目录） |
 | | `endpoint string` | WebSocket 端点: `"/reload_ws"` |
 | | `errorLog *log.Logger` | 错误日志 |
 | | `Upgrader websocket.Upgrader` | WebSocket 升级器（可配置 CheckOrigin） |
 | | `clients map[*client]bool` | 已连接客户端集合 |
+| | `maxDirs int` | 目录监听上限（`maxWatchedDirs` = 4096），超出即降级并告警 |
+| | `ready chan struct{}` | 初始监听集合注册完成后关闭 |
+| | `done chan struct{}` + `stopOnce sync.Once` | `Stop()` 结束 watch 循环并释放描述符 |
 | `client` | `conn *websocket.Conn` | WebSocket 连接 |
+
+监听范围（`docDirs`）：
+- 非递归 → 仅根目录。
+- 递归 → 含 `.md` 的目录 + 其祖先目录；跳过 `ignoredDirs`（`node_modules`/`.git`/`dist`/`.venv` 等依赖与构建目录），运行期新建的这类目录同样跳过。扫描根始终入选，因此「启动时为空、之后才出现首个 `.md`」也能被捕获。
+- 该策略把描述符开销从「仓库规模」降到「文档规模」——macOS kqueue 下每目录、每目录内每个条目各占一个 fd，全树监听必然撞上 `too many open files`。注意单个目录（尤其 kqueue 下的根目录）自身条目就可能撑满上限，故不保证绝不耗尽。
+- `addDirectories` / `adopt` 在 fd 耗尽或超过 `maxDirs` 时记录日志并降级（已注册目录继续工作），而非终止整个 watcher；fd 耗尽时调用 `watch.Remove(dir)` 回滚该目录已建立的 kqueue 监听——fsnotify 的 kqueue 后端在 `Add` 失败时不会自行回滚，残留描述符会让进程一直贴着上限。
+- `fd_unix.go` 的 `isFdExhausted()` 区分 EMFILE/ENFILE（`fd_other.go` 为非 unix 空实现）；软限制由 Go 运行时在 `syscall.init` 自行提升，本项目不再调用 `Setrlimit`。
+- 新建目录时先注册、后扫描，并广播扫描到的首个 `.md`（fsnotify 会把注册时已存在的文件标记为已见而不发事件）。顺序不可颠倒：先扫描后注册会丢掉「扫描到注册之间」落盘的文档。
 
 ## 六、HTTP 路由表
 

@@ -86,10 +86,11 @@ func (s *Server) Serve(file string) error {
 
 	var reloadMiddleware *hotreload.Reloader
 	if s.enableReload {
-		reloadMiddleware = hotreload.New(filepath.Clean(target.rootDir))
+		reloadMiddleware = hotreload.New(filepath.Clean(target.rootDir), s.recursive)
 		reloadMiddleware.Upgrader.CheckOrigin = func(r *http.Request) bool {
 			return true
 		}
+		defer reloadMiddleware.Stop()
 	}
 
 	handler := s.newHandlerForTarget(target)

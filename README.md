@@ -70,6 +70,7 @@ Additional server behavior:
 - If the default port is busy, go-grip automatically tries the next available port.
 - If a port is explicitly set with `-p`, go-grip treats that port as strict and reports an error when it is unavailable.
 - `--no-reload` disables automatic browser reload on file changes.
+- Hot reload watches directories rather than the whole tree: the served directory, or — with `--recursive` — every directory holding Markdown plus its ancestors. Dependency and build directories (`node_modules`, `.git`, `dist`, `.venv`, …) are skipped, which keeps the descriptor cost proportional to the documents instead of to the repository size.
 
 Additional editor support:
 
@@ -303,7 +304,7 @@ Click the **Import** button in the editor toolbar to open the image import dialo
 
 If the Markdown file changes on disk while the editor is open (e.g., by another program or `git pull`), go-grip detects the change and shows a dialog: **OK** reloads the latest content into the editor, **Cancel** keeps your edits and suppresses further prompts until the next save.
 
-The browser will reload automatically when a `.md` file changes on disk, unless `--no-reload` is used.
+The browser will reload automatically when a `.md` file changes on disk, unless `--no-reload` is used. The watcher covers the served directory, or — with `--recursive` — every directory holding Markdown below it. Dependency and build directories are skipped, including a `node_modules` that appears after startup. This keeps descriptor use proportional to the documents rather than the repository; if the directory budget still runs out, go-grip logs how many directories it skipped and keeps serving reloads from the ones already watched.
 
 ### Export
 
