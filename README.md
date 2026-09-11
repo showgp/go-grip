@@ -70,7 +70,7 @@ Additional server behavior:
 - If the default port is busy, go-grip automatically tries the next available port.
 - If a port is explicitly set with `-p`, go-grip treats that port as strict and reports an error when it is unavailable.
 - `--no-reload` disables automatic browser reload on file changes.
-- Hot reload watches directories rather than the whole tree: the served directory, or — with `--recursive` — every directory holding Markdown plus its ancestors. Dependency and build directories (`node_modules`, `.git`, `dist`, `.venv`, …) are skipped, which keeps the descriptor cost proportional to the documents instead of to the repository size.
+- Hot reload watches directories rather than the whole tree: the served directory, or — with `--recursive` — every directory holding Markdown plus its ancestors. Dependency and build directories (`node_modules`, `.git`, `dist`, `.venv`, …) are skipped. The watch budget is measured in what watching actually costs on the platform — one descriptor per directory entry on macOS/BSD, one inotify watch per directory on Linux — so a tree is watched as long as its documents fit, and the reloader logs what it had to leave out rather than silently failing.
 
 Additional editor support:
 
@@ -304,7 +304,9 @@ Click the **Import** button in the editor toolbar to open the image import dialo
 
 If the Markdown file changes on disk while the editor is open (e.g., by another program or `git pull`), go-grip detects the change and shows a dialog: **OK** reloads the latest content into the editor, **Cancel** keeps your edits and suppresses further prompts until the next save.
 
-The browser will reload automatically when a `.md` file changes on disk, unless `--no-reload` is used. The watcher covers the served directory, or — with `--recursive` — every directory holding Markdown below it. Dependency and build directories are skipped, including a `node_modules` that appears after startup. This keeps descriptor use proportional to the documents rather than the repository; if the directory budget still runs out, go-grip logs how many directories it skipped and keeps serving reloads from the ones already watched.
+The browser will reload automatically when a `.md` file changes on disk, unless `--no-reload` is used. The watcher covers the served directory, or — with `--recursive` — every directory holding Markdown below it. Dependency and build directories are skipped, including a `node_modules` that appears after startup.
+
+The watcher spends a budget proportional to the platform resource it consumes (descriptors on macOS/BSD, where each directory costs one per entry inside it; inotify watches on Linux). If a tree does not fit, go-grip logs how many directories it skipped and keeps serving reloads from the ones it did watch.
 
 ### Export
 

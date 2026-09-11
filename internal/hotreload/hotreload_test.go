@@ -1,6 +1,7 @@
 package hotreload
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -53,14 +54,14 @@ func TestDocDirs(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			r := testReloader(root, tt.recursive, maxWatchedDirs)
-			dirs, _ := r.docDirs(root)
+			r := testReloader(root, tt.recursive, fallbackBudget)
+			plans, _ := r.docPlans(root)
 
-			got := make([]string, 0, len(dirs))
-			for _, dir := range dirs {
-				rel, err := filepath.Rel(root, dir)
+			got := make([]string, 0, len(plans))
+			for _, plan := range plans {
+				rel, err := filepath.Rel(root, plan.path)
 				if err != nil {
-					t.Fatalf("relative path of %q: %v", dir, err)
+					t.Fatalf("relative path of %q: %v", plan.path, err)
 				}
 				got = append(got, filepath.ToSlash(rel))
 			}
@@ -83,7 +84,7 @@ func TestAddDirsStopsAtDescriptorExhaustion(t *testing.T) {
 
 	docsDir := filepath.Join(root, "docs")
 	fake := newFakeAdder(1, &os.PathError{Op: "open", Path: docsDir, Err: syscall.EMFILE})
-	r := testReloader(root, true, maxWatchedDirs)
+	r := testReloader(root, true, fallbackBudget)
 
 	added, doc := r.addDirectories(fake, root)
 	if added != 1 {
@@ -100,22 +101,24 @@ func TestAddDirsStopsAtDescriptorExhaustion(t *testing.T) {
 	}
 }
 
-// TestAdoptRespectsWatchLimit covers a directory arriving after startup while
-// the directory budget is already full: it must not be registered at all, and
-// in particular must not push the watch set past the limit.
-func TestAdoptRespectsWatchLimit(t *testing.T) {
+// TestAdoptRespectsWatchBudget covers a directory arriving after startup while
+// the budget is already spent: it must not be registered at all.
+func TestAdoptRespectsWatchBudget(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "README.md"))
 	newDir := filepath.Join(root, "fresh")
+	writeTestFile(t, filepath.Join(newDir, "fresh.md"))
 
 	fake := newFakeAdder(-1, nil)
-	fake.seed(root) // budget of one is already spent
-	r := testReloader(root, true, 1)
+	r := testReloader(root, true, fallbackBudget)
+	r.watchCost = r.maxFDs // budget already spent
+
 	r.adopt(fake, newDir, newDebouncer())
 
-	if got := fake.watched(); !slices.Equal(got, []string{root}) {
-		t.Fatalf("watched %q, want only the pre-existing watch", got)
+	if got := fake.watched(); len(got) != 0 {
+		t.Fatalf("watched %q, want nothing once the budget is spent", got)
 	}
 }
 
@@ -126,9 +129,10 @@ func TestAdoptRollsBackOnDescriptorExhaustion(t *testing.T) {
 
 	root := t.TempDir()
 	newDir := filepath.Join(root, "fresh")
+	writeTestFile(t, filepath.Join(newDir, "fresh.md"))
 
 	fake := newFakeAdder(0, &os.PathError{Op: "open", Path: newDir, Err: syscall.EMFILE})
-	r := testReloader(root, true, maxWatchedDirs)
+	r := testReloader(root, true, fallbackBudget)
 	r.adopt(fake, newDir, newDebouncer())
 
 	if got := fake.watched(); len(got) != 0 {
@@ -149,24 +153,70 @@ func TestAdoptRegistersEachDirectoryOnce(t *testing.T) {
 	writeTestFile(t, filepath.Join(newDir, "deep", "note.md"))
 
 	fake := newFakeAdder(-1, nil)
-	r := testReloader(root, true, 10)
+	r := testReloader(root, true, fallbackBudget)
 	r.adopt(fake, newDir, newDebouncer())
 
 	watched := fake.watched()
 	if !slices.Contains(watched, newDir) {
 		t.Fatalf("watched %q, want the new root", watched)
 	}
-	if slices.Contains(watched, filepath.Join(newDir, "deep")) == false {
+	if !slices.Contains(watched, filepath.Join(newDir, "deep")) {
 		t.Fatalf("watched %q, want the nested document directory too", watched)
 	}
 	if len(watched) != 2 {
 		t.Fatalf("watched %q, want each directory registered exactly once", watched)
 	}
+
+	// The budget must account for both registrations, not just the directories.
+	wantCost, err := dirWatchCost(newDir)
+	if err != nil {
+		t.Fatalf("cost of %s: %v", newDir, err)
+	}
+	deepCost, err := dirWatchCost(filepath.Join(newDir, "deep"))
+	if err != nil {
+		t.Fatalf("cost of nested directory: %v", err)
+	}
+	if r.watchCost != wantCost+deepCost {
+		t.Fatalf("watchCost = %d, want %d", r.watchCost, wantCost+deepCost)
+	}
 }
 
-// TestWatchSetLimitTruncatesWatchSet pins the cap against a real watcher: with a
-// budget of one only the shallowest directory may be registered.
-func TestWatchSetLimitTruncatesWatchSet(t *testing.T) {
+// TestWatchSetBudgetCountsDirectoryEntries pins that the budget is spent on what
+// watching a directory really costs — one unit per entry inside it on kqueue —
+// and not on the number of directories.
+func TestWatchSetBudgetCountsDirectoryEntries(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "README.md"))
+	heavy := filepath.Join(root, "heavy")
+	for i := range 20 {
+		writeTestFile(t, filepath.Join(heavy, fmt.Sprintf("doc%02d.md", i)))
+	}
+
+	fake := newFakeAdder(-1, nil)
+	// Room for the root plus everything but the last unit of the heavy directory.
+	rootCost, err := dirWatchCost(root)
+	if err != nil {
+		t.Fatalf("cost of root: %v", err)
+	}
+	heavyCost, err := dirWatchCost(heavy)
+	if err != nil {
+		t.Fatalf("cost of heavy directory: %v", err)
+	}
+	r := testReloader(root, true, rootCost+heavyCost-1)
+
+	added, _ := r.addDirectories(fake, root)
+	if added != 1 {
+		t.Fatalf("registered %d directories, want 1 (the heavy one must not fit)", added)
+	}
+	if got := fake.watched(); !slices.Equal(got, []string{root}) {
+		t.Fatalf("watched %q, want only the root", got)
+	}
+}
+
+// TestWatchSetBudgetTruncatesWatchSet pins the budget against a real watcher.
+func TestWatchSetBudgetTruncatesWatchSet(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
@@ -179,7 +229,11 @@ func TestWatchSetLimitTruncatesWatchSet(t *testing.T) {
 	}
 	defer func() { _ = watcher.Close() }()
 
-	r := testReloader(root, true, 1)
+	rootCost, err := dirWatchCost(root)
+	if err != nil {
+		t.Fatalf("cost of root: %v", err)
+	}
+	r := testReloader(root, true, rootCost)
 	if added, _ := r.addDirectories(watcher, root); added != 1 {
 		t.Fatalf("registered %d directories, want 1", added)
 	}
@@ -193,21 +247,25 @@ func TestWatchSetLimitTruncatesWatchSet(t *testing.T) {
 	}
 }
 
-// TestWatchSetLimitKeepsServingReloads drives a real watcher whose budget only
+// TestWatchSetBudgetKeepsServingReloads drives a real watcher whose budget only
 // covers the root: reloads from the covered directory must keep working while
 // documents below the truncated directories stay silent.
-func TestWatchSetLimitKeepsServingReloads(t *testing.T) {
+func TestWatchSetBudgetKeepsServingReloads(t *testing.T) {
 	t.Parallel()
 
 	root := t.TempDir()
 	writeTestFile(t, filepath.Join(root, "README.md"))
 	writeTestFile(t, filepath.Join(root, "docs", "deep.md"))
 
-	r := testReloader(root, true, 1)
+	rootCost, err := dirWatchCost(root)
+	if err != nil {
+		t.Fatalf("cost of root: %v", err)
+	}
+	r := testReloader(root, true, rootCost)
 	startReloader(t, r)
 	messages := dialReloader(t, startReloaderServer(t, r))
 
-	// Beyond the budget: reporting this would prove the cap is not applied.
+	// Beyond the budget: reporting this would prove the budget is not applied.
 	appendTestFile(t, filepath.Join(root, "docs", "deep.md"))
 	expectNoMessage(t, messages, 500*time.Millisecond)
 
@@ -222,7 +280,7 @@ func TestReloadMessages(t *testing.T) {
 	writeTestFile(t, filepath.Join(root, "docs", "guide.md"))
 	writeTestFile(t, filepath.Join(root, "node_modules", "pkg", "readme.md"))
 
-	r := testReloader(root, true, maxWatchedDirs)
+	r := testReloader(root, true, fallbackBudget)
 	startReloader(t, r)
 	messages := dialReloader(t, startReloaderServer(t, r))
 
@@ -241,7 +299,7 @@ func TestReloadWhenDocumentArrivesAfterStartup(t *testing.T) {
 
 	root := t.TempDir()
 
-	r := testReloader(root, true, maxWatchedDirs)
+	r := testReloader(root, true, fallbackBudget)
 	startReloader(t, r)
 	messages := dialReloader(t, startReloaderServer(t, r))
 
@@ -260,7 +318,7 @@ func TestReloadForNewDirectory(t *testing.T) {
 	fresh := filepath.Join(t.TempDir(), "fresh")
 	writeTestFile(t, filepath.Join(fresh, "fresh.md"))
 
-	r := testReloader(root, true, maxWatchedDirs)
+	r := testReloader(root, true, fallbackBudget)
 	startReloader(t, r)
 	messages := dialReloader(t, startReloaderServer(t, r))
 
@@ -279,7 +337,7 @@ func TestReloadForDocumentInNewEmptyDirectory(t *testing.T) {
 	root := t.TempDir()
 	writeTestFile(t, filepath.Join(root, "README.md"))
 
-	r := testReloader(root, true, maxWatchedDirs)
+	r := testReloader(root, true, fallbackBudget)
 	startReloader(t, r)
 	messages := dialReloader(t, startReloaderServer(t, r))
 
@@ -302,7 +360,7 @@ func TestIgnoredDirectoryCreatedAfterStartup(t *testing.T) {
 	staging := filepath.Join(t.TempDir(), "node_modules")
 	writeTestFile(t, filepath.Join(staging, "pkg", "readme.md"))
 
-	r := testReloader(root, true, maxWatchedDirs)
+	r := testReloader(root, true, fallbackBudget)
 	startReloader(t, r)
 	messages := dialReloader(t, startReloaderServer(t, r))
 
@@ -439,14 +497,6 @@ type fakeAdder struct {
 
 func newFakeAdder(failAt int, err error) *fakeAdder {
 	return &fakeAdder{failAt: failAt, err: err}
-}
-
-// seed marks paths as already watched without failing, to simulate a watcher
-// that has used part of its budget.
-func (f *fakeAdder) seed(paths ...string) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.adds = append(f.adds, paths...)
 }
 
 func (f *fakeAdder) Add(path string) error {

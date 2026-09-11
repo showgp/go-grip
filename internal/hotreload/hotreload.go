@@ -17,15 +17,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const (
-	wsVersion = "2"
-
-	// maxWatchedDirs bounds the number of directory watches. fsnotify holds one
-	// descriptor per watched directory plus one per file inside it, so
-	// registering an unbounded recursive tree exhausts the process descriptor
-	// table (macOS defaults to a soft limit of 256).
-	maxWatchedDirs = 4096
-)
+const wsVersion = "2"
 
 // ignoredDirs are dependency and build directories that never hold served
 // documentation. Skipping them keeps the watch set — and its descriptor cost —
@@ -55,8 +47,12 @@ type Reloader struct {
 	clients   map[*client]bool
 	clientsMu sync.RWMutex
 
-	// maxDirs caps the directory watches; the zero value watches nothing.
-	maxDirs int
+	// maxFDs bounds what the watch set may consume from the platform resource
+	// (descriptors on kqueue, inotify watches on Linux); the zero value watches
+	// nothing. watchCost is the amount consumed so far and is owned by the
+	// watch goroutine.
+	maxFDs    int
+	watchCost int
 
 	// ready is closed once the initial watch set is registered, and done is
 	// closed by stop to end the watch loop.
@@ -72,16 +68,22 @@ type watchAdder interface {
 	WatchList() []string
 }
 
+// dirPlan is a directory to watch together with what watching it consumes.
+type dirPlan struct {
+	path string
+	cost int
+}
+
 // New builds a Reloader for rootDir. Only markdown reachable through the server
 // needs to trigger a reload, so recursive mirrors the server's --recursive mode:
 // without it, subdirectories are neither served nor watched.
 func New(rootDir string, recursive bool) *Reloader {
-	r := newReloader(rootDir, recursive, maxWatchedDirs)
+	r := newReloader(rootDir, recursive, watchBudget())
 	go r.watch()
 	return r
 }
 
-func newReloader(rootDir string, recursive bool, maxDirs int) *Reloader {
+func newReloader(rootDir string, recursive bool, maxFDs int) *Reloader {
 	return &Reloader{
 		rootDir:   rootDir,
 		recursive: recursive,
@@ -89,7 +91,7 @@ func newReloader(rootDir string, recursive bool, maxDirs int) *Reloader {
 		errorLog:  log.New(os.Stderr, "HotReload: ", log.Lmsgprefix|log.Ltime),
 		Upgrader:  websocket.Upgrader{},
 		clients:   make(map[*client]bool),
-		maxDirs:   maxDirs,
+		maxFDs:    maxFDs,
 		ready:     make(chan struct{}),
 		done:      make(chan struct{}),
 	}
@@ -256,24 +258,29 @@ func (r *Reloader) handleCreate(watch *fsnotify.Watcher, name string, deb *debou
 // means such a document is seen by the scan, or by an event from the
 // already-installed watch.
 func (r *Reloader) adopt(watch watchAdder, name string, deb *debouncer) {
-	if len(watch.WatchList()) >= r.maxDirs {
-		r.errorLog.Printf("watch %s: the %d directory limit is reached; markdown below it will not trigger a reload\n",
-			name, r.maxDirs)
+	cost, err := dirWatchCost(name)
+	if err != nil {
+		return
+	}
+	if r.watchCost+cost > r.maxFDs {
+		r.errorLog.Printf("watch %s: the %d entry watch budget is reached; markdown below it will not trigger a reload\n",
+			name, r.maxFDs)
 		return
 	}
 	if err := watch.Add(name); err != nil {
 		if isFdExhausted(err) {
 			_ = watch.Remove(name)
-			r.errorLog.Printf("too many open files: %s is not watched; markdown below it will not trigger a reload\n", name)
+			r.errorLog.Printf("watch budget exhausted: %s is not watched; markdown below it will not trigger a reload\n", name)
 			return
 		}
 		r.errorLog.Printf("watch error at %s: %s\n", name, err)
 		return
 	}
+	r.watchCost += cost
 
-	dirs, firstDoc := r.docDirs(name)
+	plans, firstDoc := r.docPlans(name)
 	// name is already registered, so it must not be counted again.
-	rest := slices.DeleteFunc(dirs, func(dir string) bool { return dir == name })
+	rest := slices.DeleteFunc(plans, func(p dirPlan) bool { return p.path == name })
 	r.registerDirs(watch, name, rest)
 
 	if firstDoc == "" {
@@ -287,39 +294,50 @@ func (r *Reloader) adopt(watch watchAdder, name string, deb *debouncer) {
 }
 
 // addDirectories registers a watch on every directory that can hold a served
-// document and reports the first document found below root. Running out of
-// descriptors or hitting the watch-set limit degrades the watch set instead of
-// killing the reloader: the directories registered so far keep working.
+// document and reports the first document found below root. Running out of the
+// platform resource or budget degrades the watch set instead of killing the
+// reloader: the directories registered so far keep working.
 func (r *Reloader) addDirectories(watch watchAdder, root string) (int, string) {
-	dirs, firstDoc := r.docDirs(root)
-	return r.registerDirs(watch, root, dirs), firstDoc
+	plans, firstDoc := r.docPlans(root)
+	return r.registerDirs(watch, root, plans), firstDoc
 }
 
-// registerDirs installs a watch per directory, stopping at the directory limit
-// or when the descriptor table fills. Registered directories keep working.
-func (r *Reloader) registerDirs(watch watchAdder, root string, dirs []string) int {
+// dirWatchCost reports what watching dir consumes, or an error when it cannot be
+// read.
+func dirWatchCost(dir string) (int, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0, err
+	}
+	return dirCost(len(entries)), nil
+}
+
+// registerDirs installs a watch per directory, stopping at the budget or when
+// the platform resource fills. Registered directories keep working.
+func (r *Reloader) registerDirs(watch watchAdder, root string, plans []dirPlan) int {
 	added := 0
-	for i, dir := range dirs {
-		if len(watch.WatchList()) >= r.maxDirs {
-			r.errorLog.Printf("watch %s: %d of %d directories exceed the %d watch limit; markdown below the rest will not trigger a reload\n",
-				root, len(dirs)-i, len(dirs), r.maxDirs)
+	for i, plan := range plans {
+		if r.watchCost+plan.cost > r.maxFDs {
+			r.errorLog.Printf("watch %s: %d of %d directories exceed the %d entry watch budget; markdown below the rest will not trigger a reload\n",
+				root, len(plans)-i, len(plans), r.maxFDs)
 			break
 		}
-		if err := watch.Add(dir); err != nil {
+		if err := watch.Add(plan.path); err != nil {
 			if isFdExhausted(err) {
 				// fsnotify's kqueue backend registers the directory and every
 				// entry it managed to open before the failing one, and does not
 				// roll them back on error. Drop the partial watch so those
 				// descriptors return to the process instead of pinning it at
 				// the limit.
-				_ = watch.Remove(dir)
-				r.errorLog.Printf("too many open files: %d of %d directories under %s are unwatched; markdown below them will not trigger a reload\n",
-					len(dirs)-i, len(dirs), root)
+				_ = watch.Remove(plan.path)
+				r.errorLog.Printf("watch budget exhausted: %d of %d directories under %s are unwatched; markdown below them will not trigger a reload\n",
+					len(plans)-i, len(plans), root)
 				break
 			}
-			r.errorLog.Printf("watch error at %s: %s\n", dir, err)
+			r.errorLog.Printf("watch error at %s: %s\n", plan.path, err)
 			continue
 		}
+		r.watchCost += plan.cost
 		added++
 	}
 	return added
@@ -339,21 +357,26 @@ func firstDocument(dir string) string {
 	return ""
 }
 
-// docDirs lists the directories worth watching, plus the first markdown file
-// found. The non-recursive mode serves only the root. The recursive mode serves
-// every markdown file below the root, so their directories and the ancestors
-// needed to notice new subdirectories are watched; dependency and build
-// directories are skipped.
+// docPlans lists the directories worth watching with their cost, plus the first
+// markdown file found. The non-recursive mode serves only the root. The
+// recursive mode serves every markdown file below the root, so their directories
+// and the ancestors needed to notice new subdirectories are watched; dependency
+// and build directories are skipped.
 //
 // The scan root is always watched, even while it holds no markdown: otherwise a
 // document created in it later would go unnoticed, which is exactly how a
 // directory that arrives empty gets adopted.
-func (r *Reloader) docDirs(root string) ([]string, string) {
+func (r *Reloader) docPlans(root string) ([]dirPlan, string) {
 	if !r.recursive {
-		return []string{root}, ""
+		cost, err := dirWatchCost(root)
+		if err != nil {
+			r.errorLog.Printf("walk error at %s: %s\n", root, err)
+			return nil, ""
+		}
+		return []dirPlan{{path: root, cost: cost}}, ""
 	}
 
-	var dirs []string
+	var plans []dirPlan
 	firstDoc := ""
 	walkErrors := 0
 	var collect func(dir string) bool
@@ -386,12 +409,15 @@ func (r *Reloader) docDirs(root string) ([]string, string) {
 			}
 		}
 		if hasDocs {
-			dirs = append(dirs, dir)
+			plans = append(plans, dirPlan{path: dir, cost: dirCost(len(entries))})
 		}
 		return hasDocs
 	}
 	if !collect(root) {
-		dirs = append(dirs, root)
+		cost, err := dirWatchCost(root)
+		if err == nil {
+			plans = append(plans, dirPlan{path: root, cost: cost})
+		}
 	}
 	if walkErrors > 1 {
 		r.errorLog.Printf("%d directories could not be read; markdown below them is not watched\n", walkErrors)
@@ -399,14 +425,14 @@ func (r *Reloader) docDirs(root string) ([]string, string) {
 
 	// Shallowest first, so a truncated watch set still covers the documents
 	// closest to the root.
-	slices.SortFunc(dirs, func(a, b string) int {
+	slices.SortFunc(plans, func(a, b dirPlan) int {
 		sep := string(filepath.Separator)
-		if da, db := strings.Count(a, sep), strings.Count(b, sep); da != db {
+		if da, db := strings.Count(a.path, sep), strings.Count(b.path, sep); da != db {
 			return da - db
 		}
-		return strings.Compare(a, b)
+		return strings.Compare(a.path, b.path)
 	})
-	return dirs, firstDoc
+	return plans, firstDoc
 }
 
 func isMarkdown(name string) bool {

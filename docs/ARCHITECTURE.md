@@ -41,7 +41,11 @@ go-grip/
 │   ├── pdf_test.go
 │   └── hotreload/
 │       ├── hotreload.go        # 文件监控 + WebSocket 热重载中间件
-│       ├── fd_unix.go          # EMFILE/ENFILE 判定
+│       ├── watch_kqueue.go     # darwin/BSD: 成本=1+条目数, 预算=RLIMIT_NOFILE-保留
+│       ├── watch_linux.go      # linux: 成本=1, 预算=inotify 配额的一半
+│       ├── watch_other.go      # 其余平台: 成本=1, 保守预算
+│       ├── watch_budget.go     # 预算换算
+│       ├── fd_unix.go          # EMFILE/ENFILE/ENOSPC 判定
 │       └── fd_other.go         # 非 unix 平台的空实现
 ├── pkg/
 │   ├── alert/                  # > [!NOTE/TIP/IMPORTANT/WARNING/CAUTION] 区块
@@ -248,17 +252,20 @@ Markdown 原始文本 ([]byte)
 | | `errorLog *log.Logger` | 错误日志 |
 | | `Upgrader websocket.Upgrader` | WebSocket 升级器（可配置 CheckOrigin） |
 | | `clients map[*client]bool` | 已连接客户端集合 |
-| | `maxDirs int` | 目录监听上限（`maxWatchedDirs` = 4096），超出即降级并告警 |
+| | `maxFDs int` | 监听预算（按平台资源计：kqueue 下为描述符、Linux 下为 inotify watch 配额） |
+| | `watchCost int` | 已消耗预算，由 watch goroutine 独占 |
 | | `ready chan struct{}` | 初始监听集合注册完成后关闭 |
 | | `done chan struct{}` + `stopOnce sync.Once` | `Stop()` 结束 watch 循环并释放描述符 |
 | `client` | `conn *websocket.Conn` | WebSocket 连接 |
 
-监听范围（`docDirs`）：
+监听范围（`docPlans`）：
 - 非递归 → 仅根目录。
 - 递归 → 含 `.md` 的目录 + 其祖先目录；跳过 `ignoredDirs`（`node_modules`/`.git`/`dist`/`.venv` 等依赖与构建目录），运行期新建的这类目录同样跳过。扫描根始终入选，因此「启动时为空、之后才出现首个 `.md`」也能被捕获。
-- 该策略把描述符开销从「仓库规模」降到「文档规模」——macOS kqueue 下每目录、每目录内每个条目各占一个 fd，全树监听必然撞上 `too many open files`。注意单个目录（尤其 kqueue 下的根目录）自身条目就可能撑满上限，故不保证绝不耗尽。
-- `addDirectories` / `adopt` 在 fd 耗尽或超过 `maxDirs` 时记录日志并降级（已注册目录继续工作），而非终止整个 watcher；fd 耗尽时调用 `watch.Remove(dir)` 回滚该目录已建立的 kqueue 监听——fsnotify 的 kqueue 后端在 `Add` 失败时不会自行回滚，残留描述符会让进程一直贴着上限。
-- `fd_unix.go` 的 `isFdExhausted()` 区分 EMFILE/ENFILE（`fd_other.go` 为非 unix 空实现）；软限制由 Go 运行时在 `syscall.init` 自行提升，本项目不再调用 `Setrlimit`。
+- 预算按**真实成本**计，而非目录数量：`dirCost(entries)` 在 kqueue 平台返回 `1 + 条目数`（fsnotify 为目录本身及目录内每个条目各开一个描述符），在 Linux 返回 `1`（inotify 每目录一个 watch）。`watchBudget()` 取平台额度：kqueue 用 `RLIMIT_NOFILE` 软上限减 `fdReserve`(1024)，Linux 用 `/proc/sys/fs/inotify/max_user_watches` 的一半；两者不可读时退回 `fallbackBudget`。
+- 这是必需的：一个含 648 个文件的目录在 kqueue 下要 649 个描述符，仅按目录数设限会误判容量（曾因此出现「8694 个目录超过 4096 上限」的截断）。
+- `registerDirs` 在预算耗尽或平台资源报错（EMFILE/ENFILE/ENOSPC）时记录日志并降级：已注册目录继续工作，不再终止整个 watcher。
+- fd 耗尽时调用 `watch.Remove(dir)` 回滚该目录已建立的 kqueue 监听——fsnotify 的 kqueue 后端在 `Add` 失败时不会自行回滚，残留描述符会让进程一直贴着上限。
+- `fd_unix.go` 的 `isFdExhausted()` 区分 EMFILE/ENFILE/ENOSPC（`fd_other.go` 为非 unix 空实现）；软限制由 Go 运行时在 `syscall.init` 自行提升，本项目不调用 `Setrlimit`。
 - 新建目录时先注册、后扫描，并广播扫描到的首个 `.md`（fsnotify 会把注册时已存在的文件标记为已见而不发事件）。顺序不可颠倒：先扫描后注册会丢掉「扫描到注册之间」落盘的文档。
 
 ## 六、HTTP 路由表

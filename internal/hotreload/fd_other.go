@@ -2,5 +2,5 @@
 
 package hotreload
 
-// isFdExhausted always reports false on platforms without descriptor limits.
+// isFdExhausted always reports false on platforms without watch quotas.
 func isFdExhausted(err error) bool { return false }
