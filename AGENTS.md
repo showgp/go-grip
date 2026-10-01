@@ -79,3 +79,33 @@ Triage uses the five default canonical labels. See `docs/agents/triage-labels.md
 ### Domain docs
 
 Domain documentation uses the single-context layout. See `docs/agents/domain.md`.
+
+## OpenSpec ticket flow
+
+- For a new change, run a grilling session with the user to confirm the complete
+  requirements and non-goals. Do not create planning artifacts or code before
+  the relevant approval.
+- OpenSpec is the sole source of behavioral requirements. Read the selected
+  change's current CLI status and instructions, and the artifact paths they
+  return; do not substitute agent instructions, README, or tests for its specs.
+- Draft the proposal, spec, design, and tasks separately. Obtain approval before
+  writing each artifact, then stop for review. Do not use a one-shot workflow
+  that generates all artifacts without these checkpoints.
+- YAGNI is a scope gate: each new behavioral guarantee, defensive abstraction,
+  and permanent test must trace to an approved OpenSpec requirement or an
+  explicit repository quality rule. A review finding or a constructed edge case
+  is evidence, not a blocking criterion; discuss credible trigger, user impact,
+  simpler alternative, and cost with the user before adding handling or tests.
+- In `tasks.md`, put each checkbox, complete task description, and verification
+  criterion on one physical line; after writing or editing tasks, inspect
+  `openspec instructions apply --json` output for counts and descriptions.
+- Publish tickets one per review cycle with `tasks-to-tickets`; implement one
+  approved ticket at a time with `implement-openspec-ticket` (scoped TDD at
+  seams agreed with the user; real checks; observed CLI smoke), then stop and
+  wait for permission. Reporting progress is not permission to continue.
+- `review-openspec-ticket` performs the independent Standards and Spec review
+  before a ticket can close. A test's passing or a review's zero findings never
+  promote unapproved behavior into the spec.
+- Syncing durable specs (`openspec/specs/`) and archiving a change each require
+  separate explicit approval; do not commit on the user's behalf without
+  approval.
