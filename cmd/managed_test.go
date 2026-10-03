@@ -19,6 +19,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 const (
@@ -63,8 +65,13 @@ type managedEvent struct {
 	Generation string `json:"generation"`
 	URL        string `json:"url"`
 	Reload     *struct {
-		State string `json:"state"`
+		State  string `json:"state"`
+		Reason string `json:"reason"`
 	} `json:"reload"`
+	Target *struct {
+		State  string `json:"state"`
+		Reason string `json:"reason"`
+	} `json:"target"`
 	Code    string `json:"code"`
 	Message string `json:"message"`
 }
@@ -452,6 +459,165 @@ func TestManagedStopLeavesOtherSessionsServing(t *testing.T) {
 	}
 }
 
+// TestManagedEmptyRootReloadsNewDocument drives the real managed process over
+// an empty directory: once the watch set is active, a Markdown file created in
+// it must produce a real reload signal and be served by the same service
+// without a restart.
+func TestManagedEmptyRootReloadsNewDocument(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+
+	child := startGoGrip(t, "--managed", "gen-watch", "-r", "--", root)
+	ready := child.nextEvent(t, 10*time.Second)
+	if ready.Event != "ready" || ready.Reload == nil {
+		t.Fatalf("first event = %+v, want ready with a reload snapshot (stderr: %s)", ready, child.stderr.String())
+	}
+	origin, err := url.Parse(ready.URL)
+	if err != nil {
+		t.Fatalf("ready URL %q: %v", ready.URL, err)
+	}
+	base := origin.Scheme + "://" + origin.Host
+
+	if status, body := httpGetBody(t, ready.URL); status != http.StatusOK || !strings.Contains(body, "docs-empty") {
+		t.Fatalf("empty root preview = %d %q, want the empty state", status, body)
+	}
+
+	// The initial snapshot may still be pending; wait for real coverage before
+	// relying on the watcher.
+	if ready.Reload.State != "active" {
+		child.waitEvent(t, func(e managedEvent) bool {
+			return e.Event == "reload-status" && e.Reload != nil && e.Reload.State == "active"
+		}, 10*time.Second)
+	}
+
+	wsURL := "ws://" + origin.Host + "/reload_ws?v=2"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial %s: %v", wsURL, err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+
+	writeProcessDoc(t, filepath.Join(root, "first.md"), "# First document marker\n")
+
+	if err := conn.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		t.Fatalf("set read deadline: %v", err)
+	}
+	_, message, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("read reload message: %v (stderr: %s)", err, child.stderr.String())
+	}
+	if string(message) != "reload:first.md" {
+		t.Fatalf("reload message = %q, want the new document", message)
+	}
+
+	if status, body := httpGetBody(t, base+"/first.md"); status != http.StatusOK || !strings.Contains(body, "First document marker") {
+		t.Fatalf("new document preview = %d %q", status, body)
+	}
+	if status, body := httpGetBody(t, ready.URL); status != http.StatusOK || !strings.Contains(body, "First document marker") {
+		t.Fatalf("published URL after the new document = %d %q", status, body)
+	}
+
+	child.closeStdin()
+	if code := child.wait(t, 5*time.Second); code != 0 {
+		t.Fatalf("owner loss exit code = %d, want 0 (stderr: %s)", code, child.stderr.String())
+	}
+}
+
+// TestManagedDegradedWatchStillServesAndRefreshes pins the real degraded
+// service: when the watch budget leaves coverage incomplete, the ready
+// snapshot (or a reload-status transition) reports degraded with a reason, and
+// the accessible document is still served, including after a manual refresh
+// picks up new content.
+func TestManagedDegradedWatchStillServesAndRefreshes(t *testing.T) {
+	t.Parallel()
+
+	if runtime.GOOS != "darwin" {
+		t.Skip("the descriptor-derived watch budget applies to kqueue platforms")
+	}
+
+	root := t.TempDir()
+	doc := filepath.Join(root, "README.md")
+	writeProcessDoc(t, doc, "# Degraded initial marker\n")
+
+	child := startGoGripWithNoFileLimit(t, 128, "--managed", "gen-degraded", "-r", "--", root)
+	ready := child.nextEvent(t, 10*time.Second)
+	if ready.Event != "ready" || ready.Reload == nil {
+		t.Fatalf("first event = %+v, want ready with a reload snapshot (stderr: %s)", ready, child.stderr.String())
+	}
+
+	degraded := ready
+	if ready.Reload.State != "degraded" {
+		degraded = child.waitEvent(t, func(e managedEvent) bool {
+			return e.Reload != nil && e.Reload.State == "degraded"
+		}, 10*time.Second)
+	}
+	if degraded.Reload.Reason == "" {
+		t.Fatalf("degraded report %+v has no reason", degraded)
+	}
+
+	if status, body := httpGetBody(t, ready.URL); status != http.StatusOK || !strings.Contains(body, "Degraded initial marker") {
+		t.Fatalf("degraded preview = %d %q, want the accessible document", status, body)
+	}
+
+	writeProcessDoc(t, doc, "# Degraded refreshed marker\n")
+	if status, body := httpGetBody(t, ready.URL); status != http.StatusOK || !strings.Contains(body, "Degraded refreshed marker") {
+		t.Fatalf("degraded manual refresh = %d %q, want the new content", status, body)
+	}
+
+	child.closeStdin()
+	if code := child.wait(t, 5*time.Second); code != 0 {
+		t.Fatalf("owner loss exit code = %d, want 0 (stderr: %s)", code, child.stderr.String())
+	}
+}
+
+// TestManagedSingleFileReportsUnavailableAndRecovery pins the single-file
+// target lifecycle: removing the selected file is reported unavailable with a
+// reason while the HTTP error stays its own, and restoring the path reports
+// available again.
+func TestManagedSingleFileReportsUnavailableAndRecovery(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	doc := filepath.Join(dir, "doc.md")
+	writeProcessDoc(t, doc, "# Single file marker\n")
+
+	child := startGoGrip(t, "--managed", "gen-file-loss", "--", doc)
+	ready := child.nextEvent(t, 10*time.Second)
+	if ready.Event != "ready" {
+		t.Fatalf("first event = %+v, want ready (stderr: %s)", ready, child.stderr.String())
+	}
+	if status, body := httpGetBody(t, ready.URL); status != http.StatusOK || !strings.Contains(body, "Single file marker") {
+		t.Fatalf("single-file preview = %d %q", status, body)
+	}
+
+	if err := os.Remove(doc); err != nil {
+		t.Fatalf("remove %s: %v", doc, err)
+	}
+	if status, _ := httpGetBody(t, ready.URL); status != http.StatusNotFound {
+		t.Fatalf("removed selected file response = %d, want 404", status)
+	}
+	unavailable := child.waitEvent(t, func(e managedEvent) bool {
+		return e.Event == "target-status" && e.Target != nil && e.Target.State == "unavailable"
+	}, 10*time.Second)
+	if unavailable.Target.Reason == "" {
+		t.Fatalf("unavailable report %+v has no reason", unavailable)
+	}
+
+	writeProcessDoc(t, doc, "# Single file restored marker\n")
+	if status, body := httpGetBody(t, ready.URL); status != http.StatusOK || !strings.Contains(body, "Single file restored marker") {
+		t.Fatalf("restored selected file preview = %d %q", status, body)
+	}
+	child.waitEvent(t, func(e managedEvent) bool {
+		return e.Event == "target-status" && e.Target != nil && e.Target.State == "available"
+	}, 10*time.Second)
+
+	child.closeStdin()
+	if code := child.wait(t, 5*time.Second); code != 0 {
+		t.Fatalf("owner loss exit code = %d, want 0 (stderr: %s)", code, child.stderr.String())
+	}
+}
+
 // TestOwnerHelperProcess is the temporary owner the SIGKILL test terminates.
 // It starts the real managed service, holds the ownership pipe write end for
 // its whole lifetime, and reports the managed child PID to the parent.
@@ -495,7 +661,24 @@ type childProcess struct {
 func startGoGrip(t *testing.T, args ...string) *childProcess {
 	t.Helper()
 
-	cmd := exec.Command(managedBinary, args...)
+	return startChild(t, exec.Command(managedBinary, args...))
+}
+
+// startGoGripWithNoFileLimit starts the real binary through a shell that lowers
+// the soft descriptor limit first. On kqueue platforms the hot-reload watch
+// budget derives from RLIMIT_NOFILE, so a low limit forces a degraded watch set
+// with a real process. The shell execs the binary, so ownership and lifecycle
+// semantics stay those of a directly started process.
+func startGoGripWithNoFileLimit(t *testing.T, limit int, args ...string) *childProcess {
+	t.Helper()
+
+	script := fmt.Sprintf("ulimit -n %d; exec \"$0\" \"$@\"", limit)
+	return startChild(t, exec.Command("/bin/sh", append([]string{"-c", script, managedBinary}, args...)...))
+}
+
+func startChild(t *testing.T, cmd *exec.Cmd) *childProcess {
+	t.Helper()
+
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		t.Fatalf("stdin pipe: %v", err)
@@ -578,6 +761,21 @@ func (c *childProcess) nextEvent(t *testing.T, timeout time.Duration) managedEve
 		t.Fatalf("stdout line %q is not managed protocol JSON: %v", line, err)
 	}
 	return event
+}
+
+// waitEvent reads events until one matches want.
+func (c *childProcess) waitEvent(t *testing.T, want func(managedEvent) bool, timeout time.Duration) managedEvent {
+	t.Helper()
+
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		event := c.nextEvent(t, time.Until(deadline))
+		if want(event) {
+			return event
+		}
+	}
+	t.Fatal("timed out waiting for the managed event")
+	return managedEvent{}
 }
 
 func (c *childProcess) drainEvents(t *testing.T) []managedEvent {

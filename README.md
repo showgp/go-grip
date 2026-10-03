@@ -70,7 +70,7 @@ Additional server behavior:
 - If the default port is busy, go-grip automatically tries the next available port.
 - If a port is explicitly set with `-p`, go-grip treats that port as strict and reports an error when it is unavailable.
 - `--no-reload` disables automatic browser reload on file changes.
-- Hot reload watches directories rather than the whole tree: the served directory, or — with `--recursive` — every directory holding Markdown plus its ancestors. Dependency and build directories (`node_modules`, `.git`, `dist`, `.venv`, …) are skipped. The watch budget is measured in what watching actually costs on the platform — one descriptor per directory entry on macOS/BSD, one inotify watch per directory on Linux — so a tree is watched as long as its documents fit, and the reloader logs what it had to leave out rather than silently failing.
+- Hot reload watches directories rather than the whole tree: the served directory, or — with `--recursive` — every directory holding Markdown plus its ancestors. Dependency and build directories (`node_modules`, `.git`, `dist`, `.venv`, …) are skipped. The watch budget is measured in what watching actually costs on the platform — one descriptor per directory entry on macOS/BSD, one inotify watch per directory on Linux — so a tree is watched as long as its documents fit, and the reloader logs what it had to leave out rather than silently failing. When the macOS app hosts the preview, known incomplete watch coverage and target access failures are reported to the app as structured session state while the preview keeps serving accessible content for manual refresh; the standalone CLI keeps logging them.
 
 Additional editor support:
 
@@ -269,6 +269,17 @@ To disable automatic browser reload on file changes (useful for stable editing):
 ```bash
 go-grip --no-reload README.md
 ```
+
+To print one startup line with the actual port and preview URL as JSON (useful for tooling):
+
+```bash
+go-grip --json README.md
+```
+
+The standalone CLI does not read stdin, so closing or never connecting a terminal input does not end the server; only `CTRL-C` (or killing the process) stops it.
+
+> [!NOTE]
+> Previews started by the macOS app bind only to `127.0.0.1`. The standalone CLI keeps its existing listen policy and listens on all interfaces, so a `localhost` URL does not by itself mean a standalone server is loopback-only.
 
 To terminate the current server simply press `CTRL-C`.
 

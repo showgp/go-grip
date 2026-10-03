@@ -675,3 +675,242 @@ func managedRequest(t *testing.T, method, rawURL string) *http.Response {
 	}
 	return resp
 }
+
+// managedFrames decodes the v1 NDJSON frames of one managed process, failing
+// the test on any malformed or off-generation line.
+func managedFrames(t *testing.T, out io.Reader, generation string) <-chan managedEvent {
+	t.Helper()
+
+	frames := make(chan managedEvent, 32)
+	go func() {
+		defer close(frames)
+		reader := bufio.NewReader(out)
+		for {
+			line, err := reader.ReadString('\n')
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" && err != nil {
+				return
+			}
+			var event managedEvent
+			if err := json.Unmarshal([]byte(trimmed), &event); err != nil {
+				t.Errorf("managed stdout line %q is not JSON: %v", line, err)
+				return
+			}
+			if event.Version != managedProtocolVersion || event.Generation != generation {
+				t.Errorf("managed frame %+v is not v1 for generation %q", event, generation)
+				return
+			}
+			frames <- event
+		}
+	}()
+	return frames
+}
+
+// waitForManagedFrame waits for a frame matching want, skipping the others.
+func waitForManagedFrame(t *testing.T, frames <-chan managedEvent, want func(managedEvent) bool, timeout time.Duration) managedEvent {
+	t.Helper()
+
+	deadline := time.After(timeout)
+	for {
+		select {
+		case event, ok := <-frames:
+			if !ok {
+				t.Fatal("managed stdout closed before the expected frame")
+			}
+			if want(event) {
+				return event
+			}
+		case <-deadline:
+			t.Fatal("timed out waiting for the expected managed frame")
+			return managedEvent{}
+		}
+	}
+}
+
+// expectNoManagedFrame fails when a queued frame matching want arrives within
+// wait.
+func expectNoManagedFrame(t *testing.T, frames <-chan managedEvent, want func(managedEvent) bool, wait time.Duration) {
+	t.Helper()
+
+	deadline := time.After(wait)
+	for {
+		select {
+		case event, ok := <-frames:
+			if !ok {
+				return
+			}
+			if want(event) {
+				t.Fatalf("unexpected managed frame %+v", event)
+			}
+		case <-deadline:
+			return
+		}
+	}
+}
+
+// TestManagedTargetStatusTracksRealAccess pins the access-driven target state:
+// a failing request for an unrelated asset or a document that disappeared
+// inside an accessible directory does not flip the target; losing the served
+// root reports unavailable with the real path, and serving it again reports
+// available.
+//
+// Not parallel: constructing the reloader reads os.Stderr, which the legacy
+// TestServeJSONOutput replaces globally while running in parallel.
+func TestManagedTargetStatusTracksRealAccess(t *testing.T) {
+	root := t.TempDir()
+	writeManagedDoc(t, filepath.Join(root, "README.md"), "# Root marker\n")
+	writeManagedDoc(t, filepath.Join(root, "nested", "note.md"), "# Nested marker\n")
+
+	owner, ownerWriter := io.Pipe()
+	stdout, stdoutWriter := io.Pipe()
+	exited := make(chan struct{})
+	rt := &managedRuntime{
+		opts: ManagedOptions{
+			Generation:   "gen-target",
+			Target:       root,
+			Recursive:    true,
+			EnableReload: true,
+		},
+		stdin:         owner,
+		stdout:        stdoutWriter,
+		cleanDeadline: 2 * time.Second,
+		forceExit:     func(code int) { t.Errorf("unexpected forced exit %d", code) },
+	}
+	go func() {
+		_ = rt.run(rt.serve)
+		close(exited)
+	}()
+	t.Cleanup(func() {
+		_ = ownerWriter.Close()
+		_ = stdoutWriter.Close()
+		select {
+		case <-exited:
+		case <-time.After(5 * time.Second):
+			t.Errorf("managed run did not return during cleanup")
+		}
+	})
+
+	frames := managedFrames(t, stdout, "gen-target")
+	ready := waitForManagedFrame(t, frames, func(e managedEvent) bool { return e.Event == "ready" }, 10*time.Second)
+	origin, err := url.Parse(ready.URL)
+	if err != nil {
+		t.Fatalf("ready URL %q: %v", ready.URL, err)
+	}
+	base := origin.Scheme + "://" + origin.Host
+	isTargetStatus := func(e managedEvent) bool { return e.Event == "target-status" }
+
+	if status, _ := managedGet(t, base+"/missing.png"); status != http.StatusNotFound {
+		t.Fatalf("missing asset status = %d, want 404", status)
+	}
+	expectNoManagedFrame(t, frames, isTargetStatus, 300*time.Millisecond)
+
+	if err := os.Remove(filepath.Join(root, "nested", "note.md")); err != nil {
+		t.Fatalf("remove nested document: %v", err)
+	}
+	if status, _ := managedGet(t, base+"/nested/note.md"); status != http.StatusNotFound {
+		t.Fatalf("removed document status = %d, want 404", status)
+	}
+	expectNoManagedFrame(t, frames, isTargetStatus, 300*time.Millisecond)
+
+	if err := os.RemoveAll(root); err != nil {
+		t.Fatalf("remove served root: %v", err)
+	}
+	// The normal browser refresh path: the already-open article URL.
+	if status, _ := managedGet(t, base+"/README.md"); status != http.StatusNotFound {
+		t.Fatalf("open article after root removal = %d, want its own HTTP error", status)
+	}
+	unavailable := waitForManagedFrame(t, frames, func(e managedEvent) bool {
+		return isTargetStatus(e) && e.Target != nil && e.Target.State == "unavailable"
+	}, 10*time.Second)
+	if !strings.Contains(unavailable.Target.Reason, root) {
+		t.Fatalf("unavailable reason = %q, want the original path %q", unavailable.Target.Reason, root)
+	}
+	// The directory index reports the same failure without an empty state.
+	if status, body := managedGet(t, base+"/"); status < 400 || strings.Contains(body, "docs-empty") {
+		t.Fatalf("removed root response = %d %q, want an error without the empty state", status, body)
+	}
+
+	writeManagedDoc(t, filepath.Join(root, "README.md"), "# Recreated marker\n")
+	if status, body := managedGet(t, base+"/README.md"); status != http.StatusOK || !strings.Contains(body, "Recreated marker") {
+		t.Fatalf("recreated target preview = %d %q, want the new document", status, body)
+	}
+	waitForManagedFrame(t, frames, func(e managedEvent) bool {
+		return isTargetStatus(e) && e.Target != nil && e.Target.State == "available"
+	}, 10*time.Second)
+}
+
+// TestManagedReloadStatusSuppressesSnapshotDuplicate pins the delivery gate
+// across ready publication: a transition whose state and reason the ready
+// snapshot already carried is not reported a second time, while a later
+// transition is. The delayed-callback window is timing-dependent, so the gate
+// itself is the regression pinned here.
+func TestManagedReloadStatusSuppressesSnapshotDuplicate(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	rt := &managedRuntime{
+		opts:            ManagedOptions{Generation: "gen-dedupe"},
+		stdout:          &stdout,
+		published:       true,
+		publishedReload: &managedReloadSnapshot{State: "active"},
+	}
+	writer := newManagedWriter(&stdout, "gen-dedupe")
+
+	rt.emitReloadStatus(writer, "active", "")
+	if stdout.Len() != 0 {
+		t.Fatalf("a transition already carried by the ready snapshot was emitted again: %q", stdout.String())
+	}
+
+	rt.emitReloadStatus(writer, "degraded", "watch error")
+	var event managedEvent
+	if err := json.Unmarshal(bytes.TrimSpace(stdout.Bytes()), &event); err != nil {
+		t.Fatalf("emitted line %q is not JSON: %v", stdout.String(), err)
+	}
+	if event.Event != "reload-status" || event.Reload == nil || event.Reload.State != "degraded" || event.Reload.Reason != "watch error" {
+		t.Fatalf("event = %+v, want the later degraded transition", event)
+	}
+}
+
+// TestManagedNoReloadSnapshotIsDisabled pins the decided reload-off semantics:
+// the snapshot is disabled, the service still serves, and no coverage events
+// are fabricated.
+func TestManagedNoReloadSnapshotIsDisabled(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeManagedDoc(t, filepath.Join(root, "README.md"), "# Marker\n")
+
+	owner, ownerWriter := io.Pipe()
+	stdout, stdoutWriter := io.Pipe()
+	exited := make(chan struct{})
+	rt := &managedRuntime{
+		opts:          ManagedOptions{Generation: "gen-noreload", Target: root, Recursive: true, EnableReload: false},
+		stdin:         owner,
+		stdout:        stdoutWriter,
+		cleanDeadline: 2 * time.Second,
+		forceExit:     func(code int) { t.Errorf("unexpected forced exit %d", code) },
+	}
+	go func() {
+		_ = rt.run(rt.serve)
+		close(exited)
+	}()
+	t.Cleanup(func() {
+		_ = ownerWriter.Close()
+		_ = stdoutWriter.Close()
+		select {
+		case <-exited:
+		case <-time.After(5 * time.Second):
+			t.Errorf("managed run did not return during cleanup")
+		}
+	})
+
+	frames := managedFrames(t, stdout, "gen-noreload")
+	ready := waitForManagedFrame(t, frames, func(e managedEvent) bool { return e.Event == "ready" }, 10*time.Second)
+	if ready.Reload == nil || ready.Reload.State != "disabled" || ready.Reload.Reason != "" {
+		t.Fatalf("ready reload snapshot = %+v, want disabled without a reason", ready.Reload)
+	}
+	if status, _ := managedGet(t, ready.URL); status != http.StatusOK {
+		t.Fatalf("disabled-reload preview = %d, want 200", status)
+	}
+	expectNoManagedFrame(t, frames, func(e managedEvent) bool { return e.Event == "reload-status" }, 300*time.Millisecond)
+}

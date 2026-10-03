@@ -88,15 +88,26 @@ type managedEvent struct {
 	Generation string                 `json:"generation"`
 	URL        string                 `json:"url,omitempty"`
 	Reload     *managedReloadSnapshot `json:"reload,omitempty"`
+	Target     *managedTargetSnapshot `json:"target,omitempty"`
 	Code       string                 `json:"code,omitempty"`
 	Message    string                 `json:"message,omitempty"`
 }
 
-// managedReloadSnapshot is the reload coverage at the moment ready is
-// published: pending while the initial scan runs, active when the watch set is
-// complete, degraded when setup or the budget left it incomplete.
+// managedReloadSnapshot is the reload coverage at a point in time: pending
+// while the initial scan runs, active when the watch set is complete, degraded
+// when setup, the budget or a runtime error left it incomplete, and reason
+// carries the first known cause when it is degraded.
 type managedReloadSnapshot struct {
-	State hotreload.State `json:"state"`
+	State  hotreload.State `json:"state"`
+	Reason string          `json:"reason,omitempty"`
+}
+
+// managedTargetSnapshot is the target accessibility observed by real access:
+// available when the target root or selected file can be served, unavailable
+// when it cannot, with the observed cause.
+type managedTargetSnapshot struct {
+	State  string `json:"state"`
+	Reason string `json:"reason,omitempty"`
 }
 
 // managedWriter serializes protocol messages so concurrent emitters never
@@ -121,6 +132,18 @@ func (w *managedWriter) emit(event managedEvent) error {
 
 func (w *managedWriter) ready(url string, reload *managedReloadSnapshot) error {
 	return w.emit(managedEvent{Event: "ready", URL: url, Reload: reload})
+}
+
+// reloadStatus reports a watch coverage transition after the ready snapshot:
+// the state plus the available cause when it is degraded.
+func (w *managedWriter) reloadStatus(state hotreload.State, reason string) error {
+	return w.emit(managedEvent{Event: "reload-status", Reload: &managedReloadSnapshot{State: state, Reason: reason}})
+}
+
+// targetStatus reports that real target access found the root or selected file
+// available or unavailable, with the observed cause.
+func (w *managedWriter) targetStatus(state, reason string) error {
+	return w.emit(managedEvent{Event: "target-status", Target: &managedTargetSnapshot{State: state, Reason: reason}})
 }
 
 func (w *managedWriter) fatal(code, message string) error {
@@ -172,6 +195,16 @@ type managedRuntime struct {
 	forceExit     func(code int)
 	// owner is set by run; serve uses it to suppress ready after owner loss.
 	owner *ownerLiveness
+
+	// publishMu orders ready publication against state transitions; published
+	// marks that ready has been written and publishedReload is the snapshot it
+	// carried. Transitions observed before then are folded into the ready
+	// snapshot instead of being emitted, so ready stays the first frame of the
+	// protocol and no degradation can be lost between the snapshot and the
+	// suppression.
+	publishMu       sync.Mutex
+	published       bool
+	publishedReload *managedReloadSnapshot
 }
 
 // RunManaged runs the managed preview contract used by the macOS host. Protocol
@@ -259,17 +292,21 @@ func managedReloadSnapshotFor(reloader *hotreload.Reloader, enabled bool) *manag
 	if !enabled {
 		return &managedReloadSnapshot{State: managedReloadDisabled}
 	}
-	return &managedReloadSnapshot{State: reloader.State()}
+	state, reason := reloader.Status()
+	return &managedReloadSnapshot{State: state, Reason: reason}
 }
 
 // verifyTargetAccess confirms the target can actually be served before ready is
-// published. Directory access is already verified by the article scan that
-// resolves the initial path; a single-file target must be a regular readable
-// file, because a present path can still deny reading or not be a document at
-// all (opening a FIFO could block).
+// published, and re-checks it when access fails later. Directory targets are
+// judged at directory level: the served root itself must be readable, while a
+// single unreadable document inside an accessible directory stays a
+// request-level failure. A single-file target must be a regular readable file,
+// because a present path can still deny reading or not be a document at all
+// (opening a FIFO could block).
 func verifyTargetAccess(target serveTarget) error {
 	if target.mode != modeSingleFile {
-		return nil
+		_, err := os.ReadDir(target.rootDir)
+		return err
 	}
 	path := filepath.Join(target.rootDir, target.initialFile)
 	info, err := os.Stat(path)
@@ -302,12 +339,49 @@ func (rt *managedRuntime) ownershipEnded() bool {
 
 func (rt *managedRuntime) publishReady(writer *managedWriter, url string, reloader *hotreload.Reloader) (bool, error) {
 	emit := func() error {
-		return writer.ready(url, managedReloadSnapshotFor(reloader, rt.opts.EnableReload))
+		rt.publishMu.Lock()
+		defer rt.publishMu.Unlock()
+		snapshot := managedReloadSnapshotFor(reloader, rt.opts.EnableReload)
+		if err := writer.ready(url, snapshot); err != nil {
+			return err
+		}
+		rt.publishedReload = snapshot
+		rt.published = true
+		return nil
 	}
 	if rt.owner == nil {
 		return true, emit()
 	}
 	return rt.owner.publish(emit)
+}
+
+// emitReloadStatus forwards a coverage transition to the protocol stream.
+// A transition observed before ready is folded into the ready snapshot (taken
+// under the same lock), so it is never both missing from the snapshot and
+// suppressed here; a delayed transition whose state and reason the snapshot
+// already carried is not reported a second time.
+func (rt *managedRuntime) emitReloadStatus(writer *managedWriter, state hotreload.State, reason string) {
+	rt.publishMu.Lock()
+	defer rt.publishMu.Unlock()
+	if !rt.published {
+		return
+	}
+	if rt.publishedReload != nil && rt.publishedReload.State == state && rt.publishedReload.Reason == reason {
+		return
+	}
+	_ = writer.reloadStatus(state, reason)
+}
+
+// emitTargetStatus forwards an availability transition to the protocol stream.
+// Before ready the target was verified accessible, so a pre-ready failure can
+// only be fatal; the ready snapshot therefore already reflects it.
+func (rt *managedRuntime) emitTargetStatus(writer *managedWriter, state, reason string) {
+	rt.publishMu.Lock()
+	defer rt.publishMu.Unlock()
+	if !rt.published {
+		return
+	}
+	_ = writer.targetStatus(state, reason)
 }
 
 // serve runs the managed preview: resolve the target, start the watcher, bind
@@ -332,11 +406,17 @@ func (rt *managedRuntime) serve(ctx context.Context, writer *managedWriter) erro
 		EnableReload: rt.opts.EnableReload,
 		Recursive:    rt.opts.Recursive,
 		Parser:       NewParser(),
+		TargetStatusReporter: func(state, reason string) {
+			rt.emitTargetStatus(writer, state, reason)
+		},
 	})
 
 	var reloader *hotreload.Reloader
 	if rt.opts.EnableReload {
-		reloader = hotreload.New(filepath.Clean(target.rootDir), rt.opts.Recursive)
+		reloader = hotreload.NewWithReporter(filepath.Clean(target.rootDir), rt.opts.Recursive,
+			func(state hotreload.State, reason string) {
+				rt.emitReloadStatus(writer, state, reason)
+			})
 		reloader.Upgrader.CheckOrigin = func(*http.Request) bool { return true }
 	}
 	stopReloader := func() {

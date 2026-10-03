@@ -43,7 +43,20 @@ type Server struct {
 	pdfGenMu     sync.Mutex
 	pdfGen       *PDFGenerator
 	pdfGenErr    error
+
+	// targetStatus, when set (managed previews), receives the target
+	// accessibility transitions observed by real access; the standalone CLI
+	// keeps its existing behavior and never allocates it.
+	targetStatus   func(state, reason string)
+	targetStatusMu sync.Mutex
+	targetState    string
 }
+
+// Target accessibility states reported to the host.
+const (
+	targetStateAvailable   = "available"
+	targetStateUnavailable = "unavailable"
+)
 
 type serverInfoJSON struct {
 	Port int    `json:"port"`
@@ -61,6 +74,11 @@ type ServerOptions struct {
 	Recursive    bool
 	JSONOutput   bool
 	Parser       *Parser
+
+	// TargetStatusReporter, when set, receives target accessibility
+	// transitions (available/unavailable) observed by real access. It is a
+	// managed preview concern; the CLI leaves it nil.
+	TargetStatusReporter func(state, reason string)
 }
 
 func NewServer(host string, port int, boundingBox bool, browser bool, enableReload bool, parser *Parser) *Server {
@@ -78,7 +96,7 @@ func NewServerWithOptions(opts ServerOptions) *Server {
 	if opts.Parser == nil {
 		opts.Parser = NewParser()
 	}
-	return &Server{
+	s := &Server{
 		host:         opts.Host,
 		port:         opts.Port,
 		boundingBox:  opts.BoundingBox,
@@ -89,6 +107,14 @@ func NewServerWithOptions(opts ServerOptions) *Server {
 		jsonOutput:   opts.JSONOutput,
 		parser:       opts.Parser,
 	}
+	if opts.TargetStatusReporter != nil {
+		s.targetStatus = opts.TargetStatusReporter
+		// Managed startup verifies the target before ready is published, so
+		// the first observed state is available until real access says
+		// otherwise.
+		s.targetState = targetStateAvailable
+	}
+	return s
 }
 
 func (s *Server) log(format string, args ...interface{}) {
@@ -191,6 +217,43 @@ func (s *Server) closeInitializedPDF() {
 	}
 }
 
+// observeTargetAvailable records that the target root or the selected single
+// file was successfully accessed, reporting the transition once. Managed
+// startup verifies the target before ready, so this only fires after a
+// previously observed failure.
+func (s *Server) observeTargetAvailable() {
+	if s.targetStatus == nil {
+		return
+	}
+	s.targetStatusMu.Lock()
+	defer s.targetStatusMu.Unlock()
+	if s.targetState == targetStateAvailable {
+		return
+	}
+	s.targetState = targetStateAvailable
+	s.targetStatus(targetStateAvailable, "")
+}
+
+// observeTargetFailure re-checks the target itself after an access failure:
+// an ordinary missing asset, or a document that disappeared inside an
+// accessible directory, keeps its request-level error without flipping the
+// session's target state. Only a target-level failure is reported, with the
+// observed cause. The recheck and the transition share the status lock, so a
+// stale failure cannot overwrite a newer successful observation.
+func (s *Server) observeTargetFailure(target serveTarget) {
+	if s.targetStatus == nil {
+		return
+	}
+	s.targetStatusMu.Lock()
+	defer s.targetStatusMu.Unlock()
+	err := verifyTargetAccess(target)
+	if err == nil || s.targetState == targetStateUnavailable {
+		return
+	}
+	s.targetState = targetStateUnavailable
+	s.targetStatus(targetStateUnavailable, err.Error())
+}
+
 func (s *Server) newHandler(dir http.Dir) http.Handler {
 	s.rootDirMu.Lock()
 	s.rootDir = string(dir)
@@ -222,8 +285,12 @@ func (s *Server) newHandlerForTarget(target serveTarget) http.Handler {
 			setNoCacheHeaders(w)
 			initialPath, err := initialPathForTarget(target, s.recursive)
 			if err != nil {
+				s.observeTargetFailure(target)
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
+			}
+			if target.mode == modeDirectory {
+				s.observeTargetAvailable()
 			}
 			if initialPath != "/" {
 				http.Redirect(w, r, initialPath, http.StatusFound)
@@ -244,6 +311,13 @@ func (s *Server) newHandlerForTarget(target serveTarget) http.Handler {
 				s.renderMarkdown(w, dir, target, requestFile)
 				return
 			}
+			// A markdown request that cannot be served re-checks the target
+			// itself: losing the selected file (single-file target), or the
+			// served root (directory target, including a browser refresh of
+			// an already-open article), is reported, while a document that
+			// disappeared inside an accessible directory stays a
+			// request-level error.
+			s.observeTargetFailure(target)
 		}
 
 		isDirectory, err := isDirectory(dir, requestFile)
@@ -263,6 +337,7 @@ func (s *Server) renderMarkdown(w http.ResponseWriter, dir http.Dir, target serv
 
 	bytes, err := readToString(dir, currentFile)
 	if err != nil {
+		s.observeTargetFailure(target)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -277,6 +352,7 @@ func (s *Server) renderMarkdown(w http.ResponseWriter, dir http.Dir, target serv
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	s.observeTargetAvailable()
 	if err := serveTemplate(w, page); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -303,6 +379,7 @@ func (s *Server) newPageData(target serveTarget, currentFile string, content tem
 	if target.mode == modeDirectory {
 		discovered, err := discoverArticles(target.rootDir, s.recursive)
 		if err != nil {
+			s.observeTargetFailure(target)
 			return htmlStruct{}, err
 		}
 		articles = articlesWithActive(discovered, currentFile)

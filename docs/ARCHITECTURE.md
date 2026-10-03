@@ -85,9 +85,10 @@ main.go: main()
        │   ├─ 校验代次与不适用组合（--export/--output/--json/--host/--port）→ fatal + 退出
        │   ├─ 建立 stdin 所有权监视（先于目标 I/O）+ 2s 善后 watchdog
        │   └─ managed serve:
-       │       ├─ resolveServeTarget → 单文件可读性检查 → hotreload.New → handler + /__gogrip/ready 路由
+       │       ├─ resolveServeTarget → verifyTargetAccess（单文件常规可读 / 目录根可读）→ hotreload.NewWithReporter（状态出口先于扫描安装）→ handler + /__gogrip/ready 路由
        │       ├─ listenOn("127.0.0.1", 0, true)      // 真实回环 + OS 分配端口
-       │       ├─ stdout 发布 ready（v1 NDJSON：实际 URL + reload 快照）
+       │       ├─ stdout 发布 ready（v1 NDJSON 首帧：实际 URL + reload 快照与已知原因）
+       │       ├─ 运行期真实状态变化 → reload-status / target-status（仅变化时）
        │       └─ http.Serve；owner loss → 有界关闭 + watcher 等待 + WS 关闭 + 已初始化 PDF 释放
        │
        ├─ --export 非空？（仅独立 CLI）
@@ -185,7 +186,9 @@ Markdown 原始文本 ([]byte)
 | | `rootDir string` | 服务根目录 |
 | | `pdfGenOnce sync.Once` | PDF 生成器懒初始化 |
 | | `pdfGen *PDFGenerator` | 无头 Chrome PDF 生成器实例 |
-| `ServerOptions` | (同上对应字段) | 服务器配置结构体 |
+| | `targetStatus func(state, reason string)` | managed 目标可访问性出口；CLI 为 nil，不分配状态通道 |
+| | `targetState string` + `targetStatusMu` | 真实访问观察到的 `available` / `unavailable`（仅状态变化时报告） |
+| `ServerOptions` | (同上对应字段) | 服务器配置结构体；`TargetStatusReporter` 仅在 managed 路径设置 |
 | `htmlStruct` | `Content template.HTML` | 渲染后的 Markdown HTML |
 | | `BoundingBox bool` | 边框标志 |
 | | `CssCodeLight template.CSS` | Chroma light 主题 CSS |
@@ -267,13 +270,16 @@ Markdown 原始文本 ([]byte)
 | | `clients map[*client]bool` | 已连接客户端集合 |
 | | `maxFDs int` | 监听预算（按平台资源计：kqueue 下为描述符、Linux 下为 inotify watch 配额） |
 | | `watchCost int` | 已消耗预算，由 watch goroutine 独占 |
+| | `incomplete` + `incompleteReason` | watch goroutine 独占：覆盖不完整的标记与首个原因 |
+| | `report StateReporter` | 可选覆盖状态出口；`NewWithReporter` 在初始扫描前安装，ready 之前的变化由快照携带 |
+| | `openSource func() (*watchIO, error)` + `watchIO` | watcher 打开 seam（默认 `fsnotify.NewWatcher` 包装），供测试确定性注入创建/注册/运行期失败 |
+| | `state State` + `reason string` + `stateMu` | 当前覆盖快照与原因；`Status()` 返回两者 |
 | | `ready chan struct{}` | 初始监听集合注册完成后关闭 |
 | | `stopped chan struct{}` | watch goroutine 退出后关闭；`Stop()` 等待它 |
-| | `state State` + `stateMu` | 初始覆盖快照：`pending` / `active` / `degraded` |
 | | `done chan struct{}` + `stopOnce sync.Once` | `stop()` 结束 watch 循环 |
 | `client` | `conn *websocket.Conn` | WebSocket 连接 |
 
-`Stop()` 结束 watch 循环、等待 `stopped`（watcher 与描述符已释放）并关闭全部 WebSocket 客户端；可重复调用。启动失败（watcher 创建/预算截断/walk 错误）在初始注册后报告 `degraded`，完整原因与持续事件属于后续任务 1.3。
+`Stop()` 结束 watch 循环、等待 `stopped`（watcher 与描述符已释放）并关闭全部 WebSocket 客户端；可重复调用。启动失败（watcher 创建、walk、预算截断、注册失败）在初始注册后以 `degraded` + 首个原因进入快照/事件；运行期 watcher 错误或新增目录覆盖不足令 `active` 一次性迁移到 `degraded`（首个原因）；`State` 不再单独存在，调用方使用 `Status()`。这些出口只报告真实状态变化，不解析日志、不增加轮询。
 
 监听范围（`docPlans`）：
 - 非递归 → 仅根目录。
@@ -321,14 +327,17 @@ Markdown 原始文本 ([]byte)
 - 在目标解析、卷读取、watcher 与 listener 创建 **之前** 建立 stdin 所有权监视。宿主（或测试中的临时拥有者）仅持有写端：正常停止关闭写端，崩溃/强制终止由内核关闭，两者都表现为 EOF/读错误 → owner loss。单文件目标在 ready 前必须是可读的常规文件（FIFO/设备等非常规目标 fatal），目录访问由解析初始 URL 的文章扫描验证。
 - 使用 `listenOn("127.0.0.1", 0, true)` 真实绑定回环并由 OS 分配端口，URL 取实际端口；不使用默认端口拼接，不接受 `--host`/`--port`/`--export`/`--output`/`--json`（fatal 拒绝，不读取目标），也不由 Go 打开浏览器。
 - stdout 专用于 UTF-8 v1 NDJSON，单序列化 writer（并发事件不拼接帧）；日志/诊断走 stderr。
-- 目标可访问、handler 就绪、listener 绑定后，仅发布一次 `ready`：
+- 目标可访问、handler 就绪、listener 绑定后，仅发布一次 `ready`，且它是协议的第一帧：
 
 | 事件 | 字段 |
 |---|---|
-| `ready` | `version=1`, `generation`, `url`（完整实际 URL，含转义后的单文件路径）, `reload.state` |
+| `ready` | `version=1`, `generation`, `url`（完整实际 URL，含转义后的单文件路径）, `reload.state`；degraded 时带可获得 `reload.reason` |
+| `reload-status` | `reload.state` = `pending` / `active` / `degraded`，degraded 带 `reload.reason`；只在 ready 之后、真实覆盖状态发生变化时报告一次（同一 degraded 保留首个原因，重复错误不再发事件） |
+| `target-status` | `target.state` = `available` / `unavailable`，unavailable 带实际访问失败 `target.reason`；只在状态变化时报告 |
 | `fatal` | `code`（`target-unavailable` / `listen-failed` / `serve-failed` / `inapplicable-flags` / `invalid-generation`）, `message` |
 
-- `reload.state` 为实际快照：`pending`（初始扫描未完成）、`active`（watch 集完整）、`degraded`（watcher 创建失败、预算截断或 walk 错误导致覆盖不完整）、`disabled`（`--no-reload`）。持续 reload/target 状态事件属于后续任务 1.3。
+- 状态出口在 watcher 初始扫描前安装；ready 之前观察到的状态变化折叠进 ready 快照（发布快照与抑制共用同一把锁，不会既丢快照又丢事件），因此 ready 永远是首帧，且不会出现永久 pending 或假 active。`reload.state` 为真实覆盖：`pending`（初始扫描未完成）、`active`（watch 集完整）、`degraded`（watcher 创建失败、walk 错误、预算截断、注册失败或运行期 watcher 错误/新增目录覆盖不足）、`disabled`（`--no-reload`）。运行期错误只写日志与状态出口，不逐条驱动 UI。
+- `target-status` 只来自实际访问：目录目标按根目录级可访问性判定（根读取失败才是 unavailable），单文件目标按所选文件可读常规文件判定；目录内单篇文章或无关资源（图片、不存在子页面）的失败保持原 HTTP 错误，不翻转目标状态，也不显示为空目录。原路径再次访问成功可报告 `available`，但不后台寻找新位置、不轮询、不重连卷、不自动重启或恢复 watcher。
 - managed 专属固定路由 `HEAD/GET /__gogrip/ready` 返回 204 + `X-GoGrip-Generation`，不访问目标、不渲染正文，供宿主启动确认。
 - owner loss 后取消运行，并在独立 watchdog 的 2 秒善后期限后强制退出（绕过 defer），不等阻塞的文件系统操作或启动函数返回；正常取消路径依次执行有界 HTTP 关闭（1s Shutdown 后必要时 Close）、`hotreload.Stop()`（等待 watch 循环结束并关闭 WebSocket 客户端）、仅释放已初始化的 PDF 资源（停止不会创建 headless Chrome）、释放 listener。
 - 限制：强制退出依赖内核回收 listener/watcher 描述符；不管理 Chrome 等任意后代进程；不对不可中断的内核 I/O 承诺精确硬截止；宿主侧的 CLOEXEC 检查与 4 秒 SIGKILL 兜底由 Swift 适配器任务负责。

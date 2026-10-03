@@ -51,6 +51,31 @@ const (
 	StateDegraded State = "degraded"
 )
 
+// watchIO is the watcher surface the watch loop needs: registration plus the
+// event channels. *fsnotify.Watcher is wrapped rather than used directly
+// because its event channels are fields, not methods, and tests need a
+// deterministic seam for registration and runtime failures.
+type watchIO struct {
+	watchAdder
+	events <-chan fsnotify.Event
+	errors <-chan error
+	close  func() error
+}
+
+// openWatch opens the platform watcher. It is the Reloader's default source.
+func openWatch() (*watchIO, error) {
+	w, err := fsnotify.NewWatcher()
+	if err != nil {
+		return nil, err
+	}
+	return &watchIO{watchAdder: w, events: w.Events, errors: w.Errors, close: w.Close}, nil
+}
+
+// StateReporter receives the coverage changes after it is installed: the
+// initial snapshot once the first watch set is registered, and every later
+// transition. reason carries the available cause when the state is degraded.
+type StateReporter func(state State, reason string)
+
 type Reloader struct {
 	rootDir   string
 	recursive bool
@@ -70,12 +95,23 @@ type Reloader struct {
 	maxFDs    int
 	watchCost int
 	// incomplete records that the watch set does not cover the whole served
-	// tree; it is owned by the watch goroutine.
-	incomplete bool
+	// tree, and incompleteReason is the first known cause; both are owned by
+	// the watch goroutine.
+	incomplete       bool
+	incompleteReason string
 
-	// state is the initial coverage snapshot reported to the host.
+	// report, when set, receives every coverage transition; it is installed
+	// before the initial scan starts so a pre-ready degradation is not lost.
+	report StateReporter
+
+	// openSource opens the watcher; tests substitute it to drive registration
+	// and runtime failures deterministically.
+	openSource func() (*watchIO, error)
+
+	// state and reason are the coverage snapshot reported to the host.
 	stateMu sync.Mutex
 	state   State
+	reason  string
 
 	// ready is closed once the initial watch set is registered, and done is
 	// closed by stop to end the watch loop. stopped is closed when the watch
@@ -103,24 +139,33 @@ type dirPlan struct {
 // needs to trigger a reload, so recursive mirrors the server's --recursive mode:
 // without it, subdirectories are neither served nor watched.
 func New(rootDir string, recursive bool) *Reloader {
-	r := newReloader(rootDir, recursive, watchBudget())
+	return NewWithReporter(rootDir, recursive, nil)
+}
+
+// NewWithReporter builds a Reloader that reports its coverage state to report.
+// The reporter is installed before the initial scan starts, so a degradation
+// found during it is never lost, and only actual state changes are reported.
+func NewWithReporter(rootDir string, recursive bool, report StateReporter) *Reloader {
+	r := newReloader(rootDir, recursive, watchBudget(), report)
 	go r.watch()
 	return r
 }
 
-func newReloader(rootDir string, recursive bool, maxFDs int) *Reloader {
+func newReloader(rootDir string, recursive bool, maxFDs int, report StateReporter) *Reloader {
 	return &Reloader{
-		rootDir:   rootDir,
-		recursive: recursive,
-		endpoint:  "/reload_ws",
-		errorLog:  log.New(os.Stderr, "HotReload: ", log.Lmsgprefix|log.Ltime),
-		Upgrader:  websocket.Upgrader{},
-		clients:   make(map[*client]bool),
-		maxFDs:    maxFDs,
-		state:     StatePending,
-		ready:     make(chan struct{}),
-		done:      make(chan struct{}),
-		stopped:   make(chan struct{}),
+		rootDir:    rootDir,
+		recursive:  recursive,
+		endpoint:   "/reload_ws",
+		errorLog:   log.New(os.Stderr, "HotReload: ", log.Lmsgprefix|log.Ltime),
+		Upgrader:   websocket.Upgrader{},
+		clients:    make(map[*client]bool),
+		maxFDs:     maxFDs,
+		report:     report,
+		openSource: openWatch,
+		state:      StatePending,
+		ready:      make(chan struct{}),
+		done:       make(chan struct{}),
+		stopped:    make(chan struct{}),
 	}
 }
 
@@ -191,20 +236,20 @@ func (w *reloadResponseWriter) Write(b []byte) (int, error) {
 
 func (r *Reloader) watch() {
 	defer close(r.stopped)
-	watcher, err := fsnotify.NewWatcher()
+	source, err := r.openSource()
 	if err != nil {
 		r.errorLog.Printf("fsnotify error: %s\n", err)
-		r.setState(StateDegraded)
+		r.setState(StateDegraded, fmt.Sprintf("watch setup failed: %s", err))
 		close(r.ready)
 		return
 	}
-	defer func() { _ = watcher.Close() }()
+	defer func() { _ = source.close() }()
 
-	r.register(watcher)
+	r.register(source)
 	if r.incomplete {
-		r.setState(StateDegraded)
+		r.setState(StateDegraded, r.incompleteReason)
 	} else {
-		r.setState(StateActive)
+		r.setState(StateActive, "")
 	}
 	close(r.ready)
 
@@ -214,22 +259,23 @@ func (r *Reloader) watch() {
 		select {
 		case <-r.done:
 			return
-		case err, ok := <-watcher.Errors:
+		case err, ok := <-source.errors:
 			if !ok {
 				return
 			}
 			r.errorLog.Printf("watch error: %s\n", err)
-		case e, ok := <-watcher.Events:
+			r.markIncomplete(fmt.Sprintf("watch error: %s", err))
+		case e, ok := <-source.events:
 			if !ok {
 				return
 			}
 			switch {
 			case e.Has(fsnotify.Create):
-				r.handleCreate(watcher, e.Name, deb)
+				r.handleCreate(source, e.Name, deb)
 			case e.Has(fsnotify.Write):
 				r.handleEvent(e.Name, deb)
 			case e.Has(fsnotify.Rename), e.Has(fsnotify.Remove):
-				_ = watcher.Remove(e.Name)
+				_ = source.Remove(e.Name)
 			}
 		}
 	}
@@ -241,7 +287,9 @@ func (r *Reloader) register(watch watchAdder) {
 	if !filepath.IsAbs(root) {
 		abs, err := filepath.Abs(root)
 		if err != nil {
-			r.errorLog.Printf("abs path error: %s\n", err)
+			reason := fmt.Sprintf("abs path error: %s", err)
+			r.errorLog.Printf("%s\n", reason)
+			r.markIncomplete(reason)
 			return
 		}
 		root = abs
@@ -249,17 +297,46 @@ func (r *Reloader) register(watch watchAdder) {
 	_, _ = r.addDirectories(watch, root)
 }
 
-// State reports the watch coverage snapshot for the host integration.
-func (r *Reloader) State() State {
+// Status reports the current watch coverage and, when degraded, the reason it
+// became incomplete.
+func (r *Reloader) Status() (State, string) {
 	r.stateMu.Lock()
 	defer r.stateMu.Unlock()
-	return r.state
+	return r.state, r.reason
 }
 
-func (r *Reloader) setState(state State) {
+// setState records the coverage state and reports the transition. The reporter
+// runs outside the lock; every caller is the watch goroutine, so the events
+// stay ordered. Identical states are not reported again.
+func (r *Reloader) setState(state State, reason string) {
 	r.stateMu.Lock()
+	if r.state == state && r.reason == reason {
+		r.stateMu.Unlock()
+		return
+	}
 	r.state = state
+	r.reason = reason
 	r.stateMu.Unlock()
+	if r.report != nil {
+		r.report(state, reason)
+	}
+}
+
+// markIncomplete records that the watch set does not cover the served tree.
+// While the initial snapshot is still pending it only records the reason: the
+// snapshot taken after registration reports it. Afterwards it moves the state
+// to degraded once, keeping the first reason, so repeated errors do not produce
+// a stream of state events.
+func (r *Reloader) markIncomplete(reason string) {
+	if r.incomplete {
+		return
+	}
+	r.incomplete = true
+	r.incompleteReason = reason
+
+	if state, _ := r.Status(); state == StateActive {
+		r.setState(StateDegraded, reason)
+	}
 }
 
 // stop ends the watch loop and releases its descriptors.
@@ -297,7 +374,7 @@ func (r *Reloader) closeClients() {
 
 // handleCreate picks up directories and markdown files that appeared after the
 // initial walk.
-func (r *Reloader) handleCreate(watch *fsnotify.Watcher, name string, deb *debouncer) {
+func (r *Reloader) handleCreate(watch watchAdder, name string, deb *debouncer) {
 	fi, err := os.Stat(name)
 	if err != nil {
 		return
@@ -331,21 +408,28 @@ func (r *Reloader) handleCreate(watch *fsnotify.Watcher, name string, deb *debou
 func (r *Reloader) adopt(watch watchAdder, name string, deb *debouncer) {
 	cost, err := dirWatchCost(name)
 	if err != nil {
+		reason := fmt.Sprintf("walk error at %s: %s", name, err)
+		r.errorLog.Printf("%s\n", reason)
+		r.markIncomplete(reason)
 		return
 	}
 	if r.watchCost+cost > r.maxFDs {
-		r.errorLog.Printf("watch %s: the %d entry watch budget is reached; markdown below it will not trigger a reload\n",
-			name, r.maxFDs)
-		r.incomplete = true
+		reason := fmt.Sprintf("%s and its markdown are not watched: the %d entry watch budget is reached", name, r.maxFDs)
+		r.errorLog.Printf("watch %s: %s\n", name, reason)
+		r.markIncomplete(reason)
 		return
 	}
 	if err := watch.Add(name); err != nil {
 		if isFdExhausted(err) {
 			_ = watch.Remove(name)
-			r.errorLog.Printf("watch budget exhausted: %s is not watched; markdown below it will not trigger a reload\n", name)
+			reason := fmt.Sprintf("watch budget exhausted: %s and its markdown are unwatched", name)
+			r.errorLog.Printf("%s\n", reason)
+			r.markIncomplete(reason)
 			return
 		}
-		r.errorLog.Printf("watch error at %s: %s\n", name, err)
+		reason := fmt.Sprintf("watch error at %s: %s", name, err)
+		r.errorLog.Printf("%s\n", reason)
+		r.markIncomplete(reason)
 		return
 	}
 	r.watchCost += cost
@@ -390,9 +474,9 @@ func (r *Reloader) registerDirs(watch watchAdder, root string, plans []dirPlan) 
 	added := 0
 	for i, plan := range plans {
 		if r.watchCost+plan.cost > r.maxFDs {
-			r.errorLog.Printf("watch %s: %d of %d directories exceed the %d entry watch budget; markdown below the rest will not trigger a reload\n",
-				root, len(plans)-i, len(plans), r.maxFDs)
-			r.incomplete = true
+			reason := fmt.Sprintf("%d of %d directories under %s exceed the %d entry watch budget", len(plans)-i, len(plans), root, r.maxFDs)
+			r.errorLog.Printf("watch %s: %s; markdown below the rest will not trigger a reload\n", root, reason)
+			r.markIncomplete(reason)
 			break
 		}
 		if err := watch.Add(plan.path); err != nil {
@@ -403,13 +487,14 @@ func (r *Reloader) registerDirs(watch watchAdder, root string, plans []dirPlan) 
 				// descriptors return to the process instead of pinning it at
 				// the limit.
 				_ = watch.Remove(plan.path)
-				r.errorLog.Printf("watch budget exhausted: %d of %d directories under %s are unwatched; markdown below them will not trigger a reload\n",
-					len(plans)-i, len(plans), root)
-				r.incomplete = true
+				reason := fmt.Sprintf("watch budget exhausted: %d of %d directories under %s are unwatched", len(plans)-i, len(plans), root)
+				r.errorLog.Printf("%s; markdown below them will not trigger a reload\n", reason)
+				r.markIncomplete(reason)
 				break
 			}
-			r.errorLog.Printf("watch error at %s: %s\n", plan.path, err)
-			r.incomplete = true
+			reason := fmt.Sprintf("watch error at %s: %s", plan.path, err)
+			r.errorLog.Printf("%s\n", reason)
+			r.markIncomplete(reason)
 			continue
 		}
 		r.watchCost += plan.cost
@@ -445,8 +530,9 @@ func (r *Reloader) docPlans(root string) ([]dirPlan, string) {
 	if !r.recursive {
 		cost, err := dirWatchCost(root)
 		if err != nil {
-			r.errorLog.Printf("walk error at %s: %s\n", root, err)
-			r.incomplete = true
+			reason := fmt.Sprintf("walk error at %s: %s", root, err)
+			r.errorLog.Printf("%s\n", reason)
+			r.markIncomplete(reason)
 			return nil, ""
 		}
 		return []dirPlan{{path: root, cost: cost}}, ""
@@ -455,12 +541,14 @@ func (r *Reloader) docPlans(root string) ([]dirPlan, string) {
 	var plans []dirPlan
 	firstDoc := ""
 	walkErrors := 0
+	firstWalkErr := ""
 	var collect func(dir string) bool
 	collect = func(dir string) bool {
 		entries, err := os.ReadDir(dir)
 		if err != nil {
 			if walkErrors == 0 {
-				r.errorLog.Printf("walk error at %s: %s\n", dir, err)
+				firstWalkErr = fmt.Sprintf("walk error at %s: %s", dir, err)
+				r.errorLog.Printf("%s\n", firstWalkErr)
 			}
 			walkErrors++
 			return false
@@ -499,7 +587,7 @@ func (r *Reloader) docPlans(root string) ([]dirPlan, string) {
 		r.errorLog.Printf("%d directories could not be read; markdown below them is not watched\n", walkErrors)
 	}
 	if walkErrors > 0 {
-		r.incomplete = true
+		r.markIncomplete(firstWalkErr)
 	}
 
 	// Shallowest first, so a truncated watch set still covers the documents

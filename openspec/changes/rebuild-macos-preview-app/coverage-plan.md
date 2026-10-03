@@ -2,16 +2,16 @@
 
 本文件是整个变更的覆盖地图，不是实施票，也不是行为规格；任务进度仅由 [tasks.md](tasks.md) 记录。本次拆分不修改已批准的 [proposal.md](proposal.md)、四份 spec 或 [design.md](design.md)，不新增行为或实施授权。
 
-当前唯一已发布票是 [01 — Go managed 预览启动与所有权生命周期](tickets/01-managed-preview-lifecycle.md)，仅对应任务 **1.1、1.2**，状态为 **done（2026-10-03 实施、通过独立 Standards/Spec 审阅并关闭；证据见该票 Closure record）**。以下后续切片只用于规划，不代表票据已经创建或获准实施。
+当前已发布票为 [01 — Go managed 预览启动与所有权生命周期](tickets/01-managed-preview-lifecycle.md)（任务 **1.1、1.2**，状态 **done**；证据见其 Closure record）和 [02 — Go managed 状态反馈与独立 CLI 共存](tickets/02-managed-status-and-cli.md)（任务 **1.3、1.4**，状态 **done**；证据见其 Closure record）。03–11 仍只用于规划，不代表票据已经创建或获准实施。
 
-以下是本轮的完整覆盖规划，不是批准或发布后续票。**只有 01 已发布且已完成；02–11 均为未发布规划。** 后续每次出版重读批准 artifacts、现有票与实际 checkbox 标签，再检查范围及依赖。规格/任务可能需要多票共同贡献；所有当前已发布票完成也不等于其余任务或整项 requirement 已完成。
+以下是本轮的完整覆盖规划，不是批准或发布后续票。**01、02 已发布且已完成；03–11 均为未发布规划。** 后续每次发布重读批准 artifacts、现有票与实际 checkbox 标签，再检查范围及依赖。规格/任务可能需要多票共同贡献；所有当前已发布票完成也不等于其余任务或整项 requirement 已完成。
 
 ## Planned vertical slices and genuine blockers
 
 | Slice | 可验证的交付 | OpenSpec tasks | 真正前置 | 发布状态 |
 |---|---|---|---|---|
 | 01-managed-preview-lifecycle | 真实 Go 预览启动、回环 URL 与 owner loss 后退出 | 1.1、1.2 | None | 已发布，done |
-| 02-managed-status-and-cli | 实际目标/监视状态变化及降级仍可访问，独立 CLI 完整回归 | 1.3、1.4 | 01：managed 事件与资源生命周期 | 未发布规划 |
+| 02-managed-status-and-cli | 实际目标/监视状态变化及降级仍可访问，独立 CLI 完整回归 | 1.3、1.4 | 01：managed 事件与资源生命周期（已满足） | 已发布，done |
 | 03-owned-process-launch | Foundation 从真实 Go 反馈到可用 URL，失败清理与所有权/SIGKILL 集成 | 2.1、2.5；2.4 的进程层贡献 | 01、02：完整 Go 机器契约 | 未发布规划 |
 | 04-target-session-control | 规范化目标单飞/复用、代次隔离与真实单个/全部停止 | 2.2、2.4 的协调器及完整行为 | 03：真实进程适配 | 未发布规划 |
 | 05-native-finder-preview | 新宿主冷启动接收 Finder/手动批次，实际浏览器和运行控制，切换旧链路 | 2.3、3.1、3.2、3.4 | 04：会话事实源与停止 | 未发布规划 |
@@ -28,8 +28,8 @@
 |---|---|---|
 | 1.1 | 01 | 已发布，done |
 | 1.2 | 01 | 已发布，done |
-| 1.3 | 02 | 未发布规划 |
-| 1.4 | 02 | 未发布规划 |
+| 1.3 | 02 | 已发布，done |
+| 1.4 | 02 | 已发布，done |
 | 2.1 | 03 | 未发布规划 |
 | 2.2 | 04 | 未发布规划 |
 | 2.3 | 05 | 未发布规划 |
@@ -55,7 +55,7 @@
 
 ## Every requirement and scenario
 
-下表逐一列出四份 spec 的全部 requirement 和 scenario 原名；每行列出的贡献者共同完成该行覆盖，01 的发布不代表整个 App requirement 已完成。未写明 01 的行全部仍是未发布规划；出现 01 的行仅其 Go 部分已发布，其余仍未发布。最后的 11 是候选级集成证明，不替代组件票的 tests/smoke/docs。
+下表逐一列出四份 spec 的全部 requirement 和 scenario 原名；每行列出的贡献者共同完成该行覆盖，某个 Go 票的发布或完成不代表整个 App requirement 已完成。01、02 已发布且 done；03–11 全部仍是未发布规划。涉及 01、02 的行只发布其对应贡献，其余仍未发布。最后的 11 是候选级集成证明，不替代组件票的 tests/smoke/docs。
 
 ### macos-finder-service
 
@@ -78,16 +78,16 @@
 |---|---|---|
 | One session per normalized target | `Reopen a target through a symbolic link`；`Receive concurrent requests for the same target` | 04、05（跨入口）、11：规划 |
 | Containment does not merge target identities | `Open a child directory and a file under an active parent` | 04、11：规划 |
-| Directory and single-file preview modes | `Preview nested documents`；`Preview a selected file`；`Keep an empty directory session`；`Add Markdown to a watched empty directory` | 01（启动/内容）已发布；02（新增文档/watch）、05（原生打开）、11 规划 |
+| Directory and single-file preview modes | `Preview nested documents`；`Preview a selected file`；`Keep an empty directory session`；`Add Markdown to a watched empty directory` | 01（启动/内容）已发布，done；02（新增文档/watch）已发布，done；05（原生打开）、11 未发布规划 |
 | Verified startup and actual preview URL | `A nondefault port is used`；`Open a file with spaces and non-ASCII characters`；`Startup ends without valid readiness information` | 01（服务/URL）已发布；03（消费/失败清理）、05（原生结果）、11 规划 |
 | Loopback-only application previews | `Reach a preview from the same machine`；`Attempt to use a nonloopback interface` | 01（真实回环 bind）已发布；05（App 启动路径）、11（候选实际接口）规划 |
 | Browser opening is separate from service lifetime | `Browser opening fails after service startup`；`Close the browser preview` | 05、07（恢复入口）、11：规划 |
 | Explicit stopping confirms service termination | `Stop one of several sessions`；`Stop all application sessions` | 01（Go 退出）已发布；03（适配器）、04（单个/全部）、05（原生动作）、11 规划 |
 | Services end with their owning application | `Quit the application normally`；`Force termination of the host`；`Host exits during startup` | 01（Go owner loss）已发布；03（Foundation 所有权）、04（starting 停止）、05（App quit）、11 规划 |
 | No automatic session restoration or restart | `Relaunch with recent targets`；`A preview process exits unexpectedly` | 04（退出/不重启）、07（历史/重启）、11：规划 |
-| Unavailable paths are not empty directories | `A target is moved or deleted`；`A mounted volume becomes unavailable` | 02（Go 状态）、04（状态事实）、06（实际卷）、07（面板）、11：规划 |
-| Visible hot-reload degradation | `Watch coverage is incomplete`；`Use a network-volume preview` | 02（状态/可用内容）、06（网络卷）、07（显示/刷新）、11：规划 |
-| Independent CLI operation remains available | `Launch the renderer without the application` | 01（所有权隔离）已发布；02（完整 CLI）、03/04（owned 操作隔离）、11 规划 |
+| Unavailable paths are not empty directories | `A target is moved or deleted`；`A mounted volume becomes unavailable` | 02（Go 状态）已发布，done；04（状态事实）、06（实际卷）、07（面板）、11 未发布规划 |
+| Visible hot-reload degradation | `Watch coverage is incomplete`；`Use a network-volume preview` | 02（状态/可用内容）已发布，done；06（网络卷）、07（显示/刷新）、11 未发布规划 |
+| Independent CLI operation remains available | `Launch the renderer without the application` | 01（所有权隔离）已发布，done；02（完整 CLI）已发布，done；03/04（owned 操作隔离）、11 未发布规划 |
 
 ### macos-menu-bar-app
 

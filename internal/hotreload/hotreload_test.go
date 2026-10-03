@@ -1,6 +1,7 @@
 package hotreload
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -383,13 +384,13 @@ func TestStateReportsPendingThenActive(t *testing.T) {
 	writeTestFile(t, filepath.Join(root, "README.md"))
 
 	r := testReloader(root, true, fallbackBudget)
-	if got := r.State(); got != StatePending {
+	if got, _ := r.Status(); got != StatePending {
 		t.Fatalf("state before the watch loop = %q, want %q", got, StatePending)
 	}
 
 	startReloader(t, r)
-	if got := r.State(); got != StateActive {
-		t.Fatalf("state after registration = %q, want %q", got, StateActive)
+	if got, reason := r.Status(); got != StateActive || reason != "" {
+		t.Fatalf("state after registration = (%q, %q), want active without a reason", got, reason)
 	}
 }
 
@@ -406,7 +407,7 @@ func TestStateReportsDegradedWhenWatchSetIsTruncated(t *testing.T) {
 	r := testReloader(root, true, 0)
 	startReloader(t, r)
 
-	if got := r.State(); got != StateDegraded {
+	if got, _ := r.Status(); got != StateDegraded {
 		t.Fatalf("state with a truncated watch set = %q, want %q", got, StateDegraded)
 	}
 }
@@ -429,8 +430,8 @@ func TestStateReportsDegradedWhenRootCannotBeRead(t *testing.T) {
 	r := testReloader(root, false, fallbackBudget)
 	startReloader(t, r)
 
-	if got := r.State(); got != StateDegraded {
-		t.Fatalf("state after an undiscoverable watch set = %q, want %q", got, StateDegraded)
+	if got, reason := r.Status(); got != StateDegraded || reason == "" {
+		t.Fatalf("state after an undiscoverable watch set = (%q, %q), want degraded with a reason", got, reason)
 	}
 }
 
@@ -498,7 +499,12 @@ func waitForClients(t *testing.T, r *Reloader, want int) {
 
 // testReloader builds an inactive reloader; call startReloader to run it.
 func testReloader(rootDir string, recursive bool, maxDirs int) *Reloader {
-	r := newReloader(rootDir, recursive, maxDirs)
+	return testReloaderReporting(rootDir, recursive, maxDirs, nil)
+}
+
+// testReloaderReporting builds an inactive reloader with a coverage reporter.
+func testReloaderReporting(rootDir string, recursive bool, maxDirs int, report StateReporter) *Reloader {
+	r := newReloader(rootDir, recursive, maxDirs, report)
 	r.errorLog = log.New(io.Discard, "", 0)
 	return r
 }
@@ -651,4 +657,232 @@ func (f *fakeAdder) removed() []string {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return slices.Clone(f.removes)
+}
+
+// recordingReporter captures the coverage transitions handed to it.
+type recordingReporter struct {
+	mu     sync.Mutex
+	events []reportedState
+}
+
+type reportedState struct {
+	state  State
+	reason string
+}
+
+func (r *recordingReporter) report(state State, reason string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.events = append(r.events, reportedState{state: state, reason: reason})
+}
+
+func (r *recordingReporter) snapshot() []reportedState {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.events)
+}
+
+// waitForReport waits until a recorded transition matches want.
+func waitForReport(t *testing.T, r *recordingReporter, want func(reportedState) bool) reportedState {
+	t.Helper()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		for _, ev := range r.snapshot() {
+			if want(ev) {
+				return ev
+			}
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for a reported state; got %+v", r.snapshot())
+	return reportedState{}
+}
+
+// stubWatcher is a watchAdder whose registration outcome and event channels the
+// test controls.
+type stubWatcher struct {
+	err    error
+	events chan fsnotify.Event
+	errors chan error
+}
+
+func newStubWatcher() *stubWatcher {
+	return &stubWatcher{events: make(chan fsnotify.Event), errors: make(chan error)}
+}
+
+func (s *stubWatcher) Add(string) error    { return s.err }
+func (s *stubWatcher) Remove(string) error { return nil }
+func (s *stubWatcher) WatchList() []string { return nil }
+
+// stubSource returns the openSource seam serving a stub watcher.
+func stubSource(s *stubWatcher) func() (*watchIO, error) {
+	return func() (*watchIO, error) {
+		return &watchIO{watchAdder: s, events: s.events, errors: s.errors, close: func() error { return nil }}, nil
+	}
+}
+
+// TestReporterReportsWatchSetupFailure pins that a watcher which cannot be
+// created at all is reported as degraded with the setup error, so the ready
+// snapshot can never claim active coverage.
+func TestReporterReportsWatchSetupFailure(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "README.md"))
+
+	recorder := &recordingReporter{}
+	r := testReloaderReporting(root, true, fallbackBudget, recorder.report)
+	r.openSource = func() (*watchIO, error) { return nil, errors.New("no watch backend") }
+
+	go r.watch()
+	t.Cleanup(r.stop)
+	select {
+	case <-r.ready:
+	case <-time.After(10 * time.Second):
+		t.Fatal("watcher setup failure did not finish the initial snapshot")
+	}
+
+	got := waitForReport(t, recorder, func(ev reportedState) bool { return ev.state == StateDegraded })
+	if !strings.Contains(got.reason, "no watch backend") {
+		t.Fatalf("reason = %q, want the watcher setup error", got.reason)
+	}
+	if state, reason := r.Status(); state != StateDegraded || reason == "" {
+		t.Fatalf("Status() = (%q, %q), want degraded with a reason", state, reason)
+	}
+}
+
+// TestReporterReportsWalkError pins that a served tree the initial scan cannot
+// read is reported degraded with the failing path.
+func TestReporterReportsWalkError(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "README.md"))
+	sealed := filepath.Join(root, "sealed")
+	writeTestFile(t, filepath.Join(sealed, "note.md"))
+	if err := os.Chmod(sealed, 0o000); err != nil {
+		t.Fatalf("chmod %s: %v", sealed, err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(sealed, 0o755) })
+	if entries, err := os.ReadDir(sealed); err == nil {
+		_ = entries
+		t.Skip("directory permissions are not enforced for this user")
+	}
+
+	recorder := &recordingReporter{}
+	r := testReloaderReporting(root, true, fallbackBudget, recorder.report)
+	startReloader(t, r)
+
+	got := waitForReport(t, recorder, func(ev reportedState) bool { return ev.state == StateDegraded })
+	if !strings.Contains(got.reason, sealed) {
+		t.Fatalf("reason = %q, want the unscanned directory %q", got.reason, sealed)
+	}
+}
+
+// TestReporterReportsBudgetTruncation pins that a watch set truncated by the
+// budget is reported degraded with a reason instead of a false active.
+func TestReporterReportsBudgetTruncation(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "README.md"))
+
+	recorder := &recordingReporter{}
+	r := testReloaderReporting(root, true, 0, recorder.report)
+	startReloader(t, r)
+
+	got := waitForReport(t, recorder, func(ev reportedState) bool { return ev.state == StateDegraded })
+	if got.reason == "" {
+		t.Fatal("degraded state was reported without a reason")
+	}
+}
+
+// TestReporterReportsRegistrationExhaustion pins that a watch whose
+// registration fails (resource exhaustion) is reported degraded with the
+// failure instead of being ignored.
+func TestReporterReportsRegistrationExhaustion(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "README.md"))
+
+	recorder := &recordingReporter{}
+	r := testReloaderReporting(root, true, fallbackBudget, recorder.report)
+	stub := newStubWatcher()
+	stub.err = &os.PathError{Op: "open", Path: root, Err: syscall.EMFILE}
+	r.openSource = stubSource(stub)
+	startReloader(t, r)
+
+	got := waitForReport(t, recorder, func(ev reportedState) bool { return ev.state == StateDegraded })
+	if got.reason == "" {
+		t.Fatal("degraded state was reported without a reason")
+	}
+}
+
+// TestReporterReportsRuntimeWatchErrorOnce pins the running transition: a known
+// watch error moves an active watch set to degraded with the error text, and a
+// repeated error does not produce another state event.
+func TestReporterReportsRuntimeWatchErrorOnce(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "README.md"))
+
+	recorder := &recordingReporter{}
+	r := testReloaderReporting(root, true, fallbackBudget, recorder.report)
+	stub := newStubWatcher()
+	r.openSource = stubSource(stub)
+	startReloader(t, r)
+
+	waitForReport(t, recorder, func(ev reportedState) bool { return ev.state == StateActive })
+
+	stub.errors <- errors.New("watch stream collapsed")
+
+	got := waitForReport(t, recorder, func(ev reportedState) bool { return ev.state == StateDegraded })
+	if !strings.Contains(got.reason, "watch stream collapsed") {
+		t.Fatalf("reason = %q, want the watch error", got.reason)
+	}
+
+	count := len(recorder.snapshot())
+	stub.errors <- errors.New("watch stream collapsed again")
+	time.Sleep(200 * time.Millisecond)
+	if got := len(recorder.snapshot()); got != count {
+		t.Fatalf("reported %d transitions after a repeated error, want %d (a degraded state is reported once)", got, count)
+	}
+}
+
+// TestReporterReportsRuntimeCoverageShortfall pins that coverage lost after
+// startup — a new directory that does not fit the watch budget — is reported
+// degraded instead of silently staying active, driven through the real watch
+// loop dispatch of a create event.
+func TestReporterReportsRuntimeCoverageShortfall(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "README.md"))
+	rootCost, err := dirWatchCost(root)
+	if err != nil {
+		t.Fatalf("cost of root: %v", err)
+	}
+
+	recorder := &recordingReporter{}
+	// The initial watch set fits exactly, so the service starts active.
+	r := testReloaderReporting(root, true, rootCost, recorder.report)
+	stub := newStubWatcher()
+	r.openSource = stubSource(stub)
+	startReloader(t, r)
+	waitForReport(t, recorder, func(ev reportedState) bool { return ev.state == StateActive })
+
+	fresh := filepath.Join(root, "fresh")
+	writeTestFile(t, filepath.Join(fresh, "note.md"))
+	stub.events <- fsnotify.Event{Name: fresh, Op: fsnotify.Create}
+
+	got := waitForReport(t, recorder, func(ev reportedState) bool { return ev.state == StateDegraded })
+	if got.reason == "" {
+		t.Fatal("degraded state was reported without a reason")
+	}
+	if state, _ := r.Status(); state != StateDegraded {
+		t.Fatalf("Status() = %q, want degraded after the adopted directory did not fit", state)
+	}
 }
