@@ -1,6 +1,6 @@
 # go-grip Architecture Reference
 
-> 最后更新: 2026-05-27
+> 最后更新: 2026-10-03
 >
 > 本文档是 go-grip 工程的正式代码结构参考，面向后续迭代开发。内容基于源码直接分析，优先于其他文档。
 
@@ -25,9 +25,11 @@ go-grip/
 ├── internal/
 │   ├── server.go               # HTTP 服务核心：路由、模板渲染、API、编辑保存
 │   ├── server_test.go
+│   ├── managed.go              # 隐藏 --managed 宿主集成契约：NDJSON、ready/fatal、所有权监视与有界善后
+│   ├── managed_test.go
 │   ├── parser.go               # goldmark 解析器封装：渲染管线、扩展注册、TOC 提取
 │   ├── parser_test.go
-│   ├── listener.go             # 端口监听：默认回退 / 严格模式
+│   ├── listener.go             # 端口监听：显式 bind 地址 + 默认回退 / 严格模式
 │   ├── listener_test.go
 │   ├── target.go               # 服务目标解析：单文件 / 目录模式判定
 │   ├── target_test.go
@@ -79,13 +81,22 @@ go-grip/
 ```
 main.go: main()
   └─ cmd.Execute()                          // Cobra 解析标志
-       ├─ --export 非空？
+       ├─ --managed 已设置（隐藏宿主集成）？ → internal.RunManaged(ManagedOptions{...})
+       │   ├─ 校验代次与不适用组合（--export/--output/--json/--host/--port）→ fatal + 退出
+       │   ├─ 建立 stdin 所有权监视（先于目标 I/O）+ 2s 善后 watchdog
+       │   └─ managed serve:
+       │       ├─ resolveServeTarget → 单文件可读性检查 → hotreload.New → handler + /__gogrip/ready 路由
+       │       ├─ listenOn("127.0.0.1", 0, true)      // 真实回环 + OS 分配端口
+       │       ├─ stdout 发布 ready（v1 NDJSON：实际 URL + reload 快照）
+       │       └─ http.Serve；owner loss → 有界关闭 + watcher 等待 + WS 关闭 + 已初始化 PDF 释放
+       │
+       ├─ --export 非空？（仅独立 CLI）
        │   ├─ internal.NewParser()
        │   ├─ parser.Render(data)           // Markdown → HTML + TOC
        │   ├─ internal.BuildExportHTML()    // 填充 export.html 模板 + 图片内联
        │   └─ 写入文件或 stdout → 退出
        │
-       └─ 否则启动服务器:
+       └─ 否则启动独立服务器:
            ├─ internal.NewParser()
            ├─ internal.NewServerWithOptions(ServerOptions{...})
            │   └─ 保存 host, port, boundingBox, browser, enableReload, strictPort, recursive, parser
@@ -101,7 +112,7 @@ main.go: main()
                │       /pdf               → handlePDF (PDF 下载)
                │       /*                 → 主处理: .md 渲染 / 静态文件 / 目录列表
                ├─ handler = reloadMiddleware.Handle(handler)  // (若 enableReload) 注入 WS 脚本
-               ├─ listenOnPort(port, strictPort)              // 端口监听 (默认回退/严格模式)
+               ├─ listenOn("", port, strictPort)              // 通配绑定 (默认回退/严格模式)
                ├─ internal.Open(addr)                         // (若 browser) 打开浏览器
                └─ http.Serve(listener, handler)               // 阻塞服务
 ```
@@ -156,6 +167,8 @@ Markdown 原始文本 ([]byte)
 | 标志 `--recursive/-r` | `bool`, 默认 `false`，递归扫描子目录 |
 | 标志 `--export` | `string`, 默认 `""`，导出 HTML 文件路径 |
 | 标志 `--output` | `string`, 默认 `""`，导出输出路径 |
+| 标志 `--json` | `bool`, 默认 `false`，启动时以 JSON 输出服务信息（独立 CLI） |
+| 标志 `--managed` | `string`, 默认 `""`，隐藏；macOS 宿主集成模式，值为启动代次（见第七节） |
 
 ### 5.2 服务层 (`internal/server.go`)
 
@@ -255,8 +268,12 @@ Markdown 原始文本 ([]byte)
 | | `maxFDs int` | 监听预算（按平台资源计：kqueue 下为描述符、Linux 下为 inotify watch 配额） |
 | | `watchCost int` | 已消耗预算，由 watch goroutine 独占 |
 | | `ready chan struct{}` | 初始监听集合注册完成后关闭 |
-| | `done chan struct{}` + `stopOnce sync.Once` | `Stop()` 结束 watch 循环并释放描述符 |
+| | `stopped chan struct{}` | watch goroutine 退出后关闭；`Stop()` 等待它 |
+| | `state State` + `stateMu` | 初始覆盖快照：`pending` / `active` / `degraded` |
+| | `done chan struct{}` + `stopOnce sync.Once` | `stop()` 结束 watch 循环 |
 | `client` | `conn *websocket.Conn` | WebSocket 连接 |
+
+`Stop()` 结束 watch 循环、等待 `stopped`（watcher 与描述符已释放）并关闭全部 WebSocket 客户端；可重复调用。启动失败（watcher 创建/预算截断/walk 错误）在初始注册后报告 `degraded`，完整原因与持续事件属于后续任务 1.3。
 
 监听范围（`docPlans`）：
 - 非递归 → 仅根目录。
@@ -285,7 +302,7 @@ Markdown 原始文本 ([]byte)
 3. 路径为目录 → 清除缓存验证头 → 交由 `http.FileServer` 处理
 4. 单文件模式下访问非目标文件 → 404
 
-## 七、两种服务模式
+## 七、服务模式
 
 | 特性 | 单文件模式 (`go-grip file.md`) | 目录模式 (`go-grip` / `go-grip .` / `go-grip docs`) |
 |---|---|---|
@@ -296,6 +313,25 @@ Markdown 原始文本 ([]byte)
 | 递归子目录 | N/A | 可选 (`--recursive`) |
 | 侧边栏标题 | N/A | 使用目录名 |
 | TOC | 页面内嵌 | 右侧独立 TOC 面板 |
+
+### managed 宿主集成模式（隐藏 `--managed <generation>`）
+
+`internal/managed.go` 为 macOS 宿主提供稳定机器契约；独立 CLI 行为不受影响。managed 模式：
+
+- 在目标解析、卷读取、watcher 与 listener 创建 **之前** 建立 stdin 所有权监视。宿主（或测试中的临时拥有者）仅持有写端：正常停止关闭写端，崩溃/强制终止由内核关闭，两者都表现为 EOF/读错误 → owner loss。单文件目标在 ready 前必须是可读的常规文件（FIFO/设备等非常规目标 fatal），目录访问由解析初始 URL 的文章扫描验证。
+- 使用 `listenOn("127.0.0.1", 0, true)` 真实绑定回环并由 OS 分配端口，URL 取实际端口；不使用默认端口拼接，不接受 `--host`/`--port`/`--export`/`--output`/`--json`（fatal 拒绝，不读取目标），也不由 Go 打开浏览器。
+- stdout 专用于 UTF-8 v1 NDJSON，单序列化 writer（并发事件不拼接帧）；日志/诊断走 stderr。
+- 目标可访问、handler 就绪、listener 绑定后，仅发布一次 `ready`：
+
+| 事件 | 字段 |
+|---|---|
+| `ready` | `version=1`, `generation`, `url`（完整实际 URL，含转义后的单文件路径）, `reload.state` |
+| `fatal` | `code`（`target-unavailable` / `listen-failed` / `serve-failed` / `inapplicable-flags` / `invalid-generation`）, `message` |
+
+- `reload.state` 为实际快照：`pending`（初始扫描未完成）、`active`（watch 集完整）、`degraded`（watcher 创建失败、预算截断或 walk 错误导致覆盖不完整）、`disabled`（`--no-reload`）。持续 reload/target 状态事件属于后续任务 1.3。
+- managed 专属固定路由 `HEAD/GET /__gogrip/ready` 返回 204 + `X-GoGrip-Generation`，不访问目标、不渲染正文，供宿主启动确认。
+- owner loss 后取消运行，并在独立 watchdog 的 2 秒善后期限后强制退出（绕过 defer），不等阻塞的文件系统操作或启动函数返回；正常取消路径依次执行有界 HTTP 关闭（1s Shutdown 后必要时 Close）、`hotreload.Stop()`（等待 watch 循环结束并关闭 WebSocket 客户端）、仅释放已初始化的 PDF 资源（停止不会创建 headless Chrome）、释放 listener。
+- 限制：强制退出依赖内核回收 listener/watcher 描述符；不管理 Chrome 等任意后代进程；不对不可中断的内核 I/O 承诺精确硬截止；宿主侧的 CLOEXEC 检查与 4 秒 SIGKILL 兜底由 Swift 适配器任务负责。
 
 ## 八、Markdown 扩展体系
 
@@ -359,11 +395,13 @@ WebSocket 端点: /reload_ws
 
 版本号 `wsVersion = "2"` 通过 WebSocket URL 参数传递，用于版本不匹配时强制整页刷新。
 
-## 十、端口回退机制 (`internal/listener.go`)
+## 十、端口监听与回退机制 (`internal/listener.go`)
 
 ```
-listenOnPort(port, strictPort):
-  ├─ strictPort=true (用户显式指定 --port):
+listenOn(bind, port, strictPort):
+  ├─ bind="" (独立 CLI): 监听通配地址（与既有行为一致）
+  ├─ bind="127.0.0.1" (managed): 真实回环地址
+  ├─ strictPort=true (用户显式指定 --port / managed port 0):
   │   └─ net.Listen 失败 → 直接报错
   │
   └─ strictPort=false (默认):
@@ -373,6 +411,8 @@ listenOnPort(port, strictPort):
       ├─ ...
       └─ 最大尝试 100 次 → 全部失败则报错
 ```
+
+managed 路径固定 `listenOn("127.0.0.1", 0, true)`：端口由 OS 分配，URL 使用 listener 实际端口；独立 CLI 的通配绑定与网络暴露政策不变。
 
 ## 十一、导出功能
 

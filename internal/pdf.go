@@ -149,6 +149,10 @@ type PDFGenerator struct {
 	maxConcurrent int
 }
 
+// newPDFGenerator is the constructor used by the server. Tests replace it to
+// observe whether a stop initializes the headless browser pool at all.
+var newPDFGenerator = NewPDFGenerator
+
 // NewPDFGenerator creates a new PDFGenerator with a headless Chrome allocator.
 // maxConcurrent controls how many PDFs can be generated in parallel (1-4).
 func NewPDFGenerator(maxConcurrent int) (*PDFGenerator, error) {

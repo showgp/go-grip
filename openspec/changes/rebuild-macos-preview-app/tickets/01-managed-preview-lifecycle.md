@@ -1,6 +1,6 @@
 # 01 — Go managed 预览启动与所有权生命周期
 
-Status: open
+Status: done
 Blocked by: None
 Covers OpenSpec tasks: 1.1, 1.2
 Behavior source: ../specs/macos-preview-sessions/spec.md
@@ -14,7 +14,7 @@ Proposal source: ../proposal.md
 
 本票交付可运行的 Go managed 纵向切片、对应行为回归、真实子进程/HTTP smoke 及架构文档，不是只声明参数或协议的占位实现。它为新原生宿主提供基础，不宣称已完成 Finder、Swift 会话管理或候选 App 验收。
 
-本轮只发布本票供审阅；尚未批准实施。`tasks.md` 是唯一变更进度账本；下列 acceptance checkbox 是本票的验收细节，不代替 OpenSpec 任务进度。票据保持 open，直至整张票验证完成并通过独立 Standards/Spec 审阅。
+本轮已实施本票：行为回归、真实子进程/HTTP smoke 与架构文档均已完成，且通过独立 Standards/Spec 审阅后关闭（证据见文末 Closure record）。`tasks.md` 是唯一变更进度账本；下列 acceptance checkbox 是本票的验收细节，不代替 OpenSpec 任务进度。仅 1.1、1.2 按证据勾选，其他任务须逐票发布、审阅及获准实施。
 
 ## Source mapping
 
@@ -53,18 +53,29 @@ Proposal source: ../proposal.md
 
 ## Acceptance
 
-- [ ] 按 scoped TDD 先复现 startup 失败无有效 ready、含中文/空格单文件定位、真实回环监听及 owner loss 的消费者可见行为，再实现并记录失败前/通过后的对应检查；永久测试使用隔离目标与实际结果，不固定内部类名、字段复制、日志/源文本、转发或资源搬运。
-- [ ] 实际构建 Go 工具，以 argv 和专用 stdin Pipe 启动 `--managed <generation>`，目录传 `-r`、目标前传 `--`；递归目录、所选单文件及可访问空目录均能取得实际 URL，GET 验证对应内容/空状态，中文/空格文件不会定位到父目录或另一文章。
-- [ ] 从真实 listener/socket 观察 managed 绑定 `127.0.0.1` 和 OS 分配端口；反馈 URL 与该端口对应，HEAD 启动确认得到 204、匹配代次及无正文，不把 localhost 文本或仅创建进程当作监听/可用性证明。
-- [ ] 目标访问或服务启动失败时有可获得的 fatal 原因并退出，不发布成功 ready 或留下 listener/watcher；不适用的导出组合不读取/导出目标。managed stdout 不混入独立 JSON/普通日志，初始 reload 是实际状态，不用永久 pending、假 active 或固定端口掩盖未实现能力。
-- [ ] ready 前 owner loss 和运行中关闭 writer 均导致对应 Go 子进程退出；回归包含 ownership 读错误及受控阻塞启动工作，证明取消/2 秒 watchdog 独立于主启动完成。真实 Go smoke 记录 PID、实际 URL/端口与释放结果，不能由 fake shell port、`isRunning` 或正常退出回调代替。
-- [ ] 实际强制终止临时拥有者，观察它启动的 managed Go 结束且端口不再提供内容，不依赖再次启动拥有者清理；该 smoke 不冒充尚未实现的生产 Foundation launch、App SIGKILL 或 TCC 证据，也不新增测试专用 CLI flags。
-- [ ] 正常关闭能够结束并等待 watcher、关闭 WebSocket 和已经初始化的 PDF 资源，未初始化 PDF 时不创建 generator；阻塞善后由独立 watchdog 收尾，不把信号发出或仅关闭 listener 当作完整停止。
-- [ ] 同时启动另一 managed 服务及独立 CLI，关闭一个 managed writer 后其余服务仍可提供各自内容；独立 CLI 的 stdin 关闭或无 App 不会触发 managed 退出，既有 `--json` 和端口策略不被本票改坏，不借此宣称任务 1.4 已全量完成。
-- [ ] 本票对应行为回归和 `go test ./...` 通过，真实 binary/HTTP/owner smoke 有可复查结果，`docs/ARCHITECTURE.md` 与已观察事实同步，未验证的原生/平台环境明确标出；通过独立 Standards/Spec 审阅后才允许关闭票及勾选已完整满足的 1.1、1.2，不检查其他任务。
+- [x] 按 scoped TDD 先复现 startup 失败无有效 ready、含中文/空格单文件定位、真实回环监听及 owner loss 的消费者可见行为，再实现并记录失败前/通过后的对应检查；永久测试使用隔离目标与实际结果，不固定内部类名、字段复制、日志/源文本、转发或资源搬运。
+- [x] 实际构建 Go 工具，以 argv 和专用 stdin Pipe 启动 `--managed <generation>`，目录传 `-r`、目标前传 `--`；递归目录、所选单文件及可访问空目录均能取得实际 URL，GET 验证对应内容/空状态，中文/空格文件不会定位到父目录或另一文章。
+- [x] 从真实 listener/socket 观察 managed 绑定 `127.0.0.1` 和 OS 分配端口；反馈 URL 与该端口对应，HEAD 启动确认得到 204、匹配代次及无正文，不把 localhost 文本或仅创建进程当作监听/可用性证明。
+- [x] 目标访问或服务启动失败时有可获得的 fatal 原因并退出，不发布成功 ready 或留下 listener/watcher；不适用的导出组合不读取/导出目标。managed stdout 不混入独立 JSON/普通日志，初始 reload 是实际状态，不用永久 pending、假 active 或固定端口掩盖未实现能力。
+- [x] ready 前 owner loss 和运行中关闭 writer 均导致对应 Go 子进程退出；回归包含 ownership 读错误及受控阻塞启动工作，证明取消/2 秒 watchdog 独立于主启动完成。真实 Go smoke 记录 PID、实际 URL/端口与释放结果，不能由 fake shell port、`isRunning` 或正常退出回调代替。
+- [x] 实际强制终止临时拥有者，观察它启动的 managed Go 结束且端口不再提供内容，不依赖再次启动拥有者清理；该 smoke 不冒充尚未实现的生产 Foundation launch、App SIGKILL 或 TCC 证据，也不新增测试专用 CLI flags。
+- [x] 正常关闭能够结束并等待 watcher、关闭 WebSocket 和已经初始化的 PDF 资源，未初始化 PDF 时不创建 generator；阻塞善后由独立 watchdog 收尾，不把信号发出或仅关闭 listener 当作完整停止。
+- [x] 同时启动另一 managed 服务及独立 CLI，关闭一个 managed writer 后其余服务仍可提供各自内容；独立 CLI 的 stdin 关闭或无 App 不会触发 managed 退出，既有 `--json` 和端口策略不被本票改坏，不借此宣称任务 1.4 已全量完成。
+- [x] 本票对应行为回归和 `go test ./...` 通过，真实 binary/HTTP/owner smoke 有可复查结果，`docs/ARCHITECTURE.md` 与已观察事实同步，未验证的原生/平台环境明确标出；通过独立 Standards/Spec 审阅后才允许关闭票及勾选已完整满足的 1.1、1.2，不检查其他任务。
 
 ## Change-wide coverage reference
 
 完整任务与规格覆盖地图见 [coverage-plan.md](../coverage-plan.md)。该文件区分已发布票与未发布的未来切片，不是本票的实施或验收清单。
 
 本票实施范围仅为 **1.1、1.2**，以上范围及验收条件不变；其他任务须逐票发布、审阅及获准实施。
+
+## Closure record
+
+- 关闭：2026-10-03，状态 `done`；OpenSpec 任务 1.1、1.2 按实际证据勾选，其他任务未勾选。
+- 变更面：`cmd/root.go`（隐藏 `--managed` 与不适用组合拒绝）、`internal/managed.go`（v1 NDJSON、所有权监视/liveness、2s watchdog、回环绑定与 readiness 路由、有界停止）、`internal/hotreload/hotreload.go`（`Stop` 等待循环并关闭 WS 客户端、初始覆盖 State）、`internal/listener.go`（显式 bind）、`internal/server.go`（PDF 释放保护）、`docs/ARCHITECTURE.md`；测试：`internal/managed_test.go`、`internal/hotreload/hotreload_test.go`、`internal/listener_test.go`、`cmd/managed_test.go`。
+- 自动检查：`gofmt -l .`、`go vet ./...` 干净；`go test ./... -count=1` 全部通过；`go test -race ./internal/... ./cmd/...` 连续多轮通过；`golangci-lint run ./...` 仅剩 `internal/server_test.go:339-340` 既有 errcheck（本票未触碰该文件）。
+- 真实 smoke（临时拥有者 + 真实二进制）：ready 为 v1 NDJSON，URL 为 `http://127.0.0.1:<OS 端口>/…`，reload 快照为真实 `pending`/`active`；GET README 与嵌套文档 200 且内容匹配；HEAD `/__gogrip/ready` 204 + `X-GoGrip-Generation`；`lsof` 观察到 `TCP 127.0.0.1:<port> (LISTEN)`；owner SIGKILL 后约 0.03s 子进程与端口消失；双 managed + 独立 `--json` CLI 共存，关闭 A 后 B 与独立 CLI 继续服务（stdin 关闭不影响独立 CLI）。
+- 独立审阅：Standards 与 Spec 两轴最终均无未解决的 blocking finding；Standards 复审确认 watchdog 独立于阻塞写、发布与 owner loss 的串行化、非常规目标拒绝；Spec 复审确认与 `macos-preview-sessions` 无冲突。
+- 范围裁决（用户确认）：保留 `reload.state = "disabled"`（`--no-reload`）；目录目标按目录级可访问判定，初始文章不可读按请求级处理（任务 1.3）；显式非激活标志按值判定。
+- 复审修正（2026-10-03）：票面第 17 行与 `coverage-plan.md` 的 open/未实施状态文本已同步为 `done`；删除 `internal/managed_test.go` 中与 `cmd/managed_test.go` 的 `TestManagedRejectsInapplicableInvocations` 重复的进程内 flag 拒绝用例（严重级/事件码/先于目标 I/O 的拒绝语义由真实二进制用例覆盖）；复跑 `go test ./...` 与 `-race` 均通过。
+- 未覆盖/限制：Swift/AppKit/Finder、TCC、打包与候选验收属后续票；未做 Intel 或 macOS 13 实际运行；强制退出不承诺不可中断内核 I/O 的精确硬截止，也不管理 Chrome 等后代进程。

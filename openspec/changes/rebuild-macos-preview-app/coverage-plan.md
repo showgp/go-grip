@@ -2,15 +2,15 @@
 
 本文件是整个变更的覆盖地图，不是实施票，也不是行为规格；任务进度仅由 [tasks.md](tasks.md) 记录。本次拆分不修改已批准的 [proposal.md](proposal.md)、四份 spec 或 [design.md](design.md)，不新增行为或实施授权。
 
-当前唯一已发布票是 [01 — Go managed 预览启动与所有权生命周期](tickets/01-managed-preview-lifecycle.md)，仅对应任务 **1.1、1.2**，状态为 **open，待审阅、未实施**。以下后续切片只用于规划，不代表票据已经创建或获准实施。
+当前唯一已发布票是 [01 — Go managed 预览启动与所有权生命周期](tickets/01-managed-preview-lifecycle.md)，仅对应任务 **1.1、1.2**，状态为 **done（2026-10-03 实施、通过独立 Standards/Spec 审阅并关闭；证据见该票 Closure record）**。以下后续切片只用于规划，不代表票据已经创建或获准实施。
 
-以下是本轮的完整覆盖规划，不是批准或发布后续票。**只有 01 已发布，状态仍为 open；02–11 均为未发布规划。** 后续每次出版重读批准 artifacts、现有票与实际 checkbox 标签，再检查范围及依赖。规格/任务可能需要多票共同贡献；所有当前已发布票完成也不等于其余任务或整项 requirement 已完成。
+以下是本轮的完整覆盖规划，不是批准或发布后续票。**只有 01 已发布且已完成；02–11 均为未发布规划。** 后续每次出版重读批准 artifacts、现有票与实际 checkbox 标签，再检查范围及依赖。规格/任务可能需要多票共同贡献；所有当前已发布票完成也不等于其余任务或整项 requirement 已完成。
 
 ## Planned vertical slices and genuine blockers
 
 | Slice | 可验证的交付 | OpenSpec tasks | 真正前置 | 发布状态 |
 |---|---|---|---|---|
-| 01-managed-preview-lifecycle | 真实 Go 预览启动、回环 URL 与 owner loss 后退出 | 1.1、1.2 | None | 已发布，open |
+| 01-managed-preview-lifecycle | 真实 Go 预览启动、回环 URL 与 owner loss 后退出 | 1.1、1.2 | None | 已发布，done |
 | 02-managed-status-and-cli | 实际目标/监视状态变化及降级仍可访问，独立 CLI 完整回归 | 1.3、1.4 | 01：managed 事件与资源生命周期 | 未发布规划 |
 | 03-owned-process-launch | Foundation 从真实 Go 反馈到可用 URL，失败清理与所有权/SIGKILL 集成 | 2.1、2.5；2.4 的进程层贡献 | 01、02：完整 Go 机器契约 | 未发布规划 |
 | 04-target-session-control | 规范化目标单飞/复用、代次隔离与真实单个/全部停止 | 2.2、2.4 的协调器及完整行为 | 03：真实进程适配 | 未发布规划 |
@@ -26,8 +26,8 @@
 
 | 实际 checkbox 标签 | 贡献 slice | 发布状态 |
 |---|---|---|
-| 1.1 | 01 | 已发布，未实施 |
-| 1.2 | 01 | 已发布，未实施 |
+| 1.1 | 01 | 已发布，done |
+| 1.2 | 01 | 已发布，done |
 | 1.3 | 02 | 未发布规划 |
 | 1.4 | 02 | 未发布规划 |
 | 2.1 | 03 | 未发布规划 |

@@ -40,6 +40,7 @@ type Server struct {
 	listener     net.Listener
 	listenerMu   sync.RWMutex
 	pdfGenOnce   sync.Once
+	pdfGenMu     sync.Mutex
 	pdfGen       *PDFGenerator
 	pdfGenErr    error
 }
@@ -125,7 +126,7 @@ func (s *Server) Serve(file string) error {
 		s.log("🔄 Auto-reload disabled. Use F5 to manually refresh.\n")
 	}
 
-	listener, actualPort, err := listenOnPort(s.port, s.strictPort)
+	listener, actualPort, err := listenOn("", s.port, s.strictPort)
 	if err != nil {
 		return err
 	}
@@ -177,6 +178,17 @@ func (s *Server) Stop() error {
 		return l.Close()
 	}
 	return nil
+}
+
+// closeInitializedPDF releases PDF resources only when a preview request
+// already created the generator; stopping must not start headless Chrome.
+func (s *Server) closeInitializedPDF() {
+	s.pdfGenMu.Lock()
+	gen := s.pdfGen
+	s.pdfGenMu.Unlock()
+	if gen != nil {
+		gen.Close()
+	}
 }
 
 func (s *Server) newHandler(dir http.Dir) http.Handler {
@@ -404,7 +416,10 @@ func (s *Server) handlePDF(w http.ResponseWriter, r *http.Request) {
 
 	// Lazy-init PDF generator
 	s.pdfGenOnce.Do(func() {
-		s.pdfGen, s.pdfGenErr = NewPDFGenerator(2)
+		gen, err := newPDFGenerator(2)
+		s.pdfGenMu.Lock()
+		s.pdfGen, s.pdfGenErr = gen, err
+		s.pdfGenMu.Unlock()
 	})
 	if s.pdfGenErr != nil {
 		http.Error(w, "PDF generator: "+s.pdfGenErr.Error(), http.StatusInternalServerError)

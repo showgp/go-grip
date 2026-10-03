@@ -373,6 +373,129 @@ func TestIgnoredDirectoryCreatedAfterStartup(t *testing.T) {
 	expectMessage(t, messages, "reload:README.md")
 }
 
+// TestStateReportsPendingThenActive pins the initial watch snapshot the managed
+// ready event carries: pending before the initial watch set is registered,
+// active once it is complete.
+func TestStateReportsPendingThenActive(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "README.md"))
+
+	r := testReloader(root, true, fallbackBudget)
+	if got := r.State(); got != StatePending {
+		t.Fatalf("state before the watch loop = %q, want %q", got, StatePending)
+	}
+
+	startReloader(t, r)
+	if got := r.State(); got != StateActive {
+		t.Fatalf("state after registration = %q, want %q", got, StateActive)
+	}
+}
+
+// TestStateReportsDegradedWhenWatchSetIsTruncated pins that an incomplete
+// initial watch set is not reported as active coverage.
+func TestStateReportsDegradedWhenWatchSetIsTruncated(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "README.md"))
+	writeTestFile(t, filepath.Join(root, "docs", "note.md"))
+
+	// A zero budget registers no directory at all, leaving the tree unwatched.
+	r := testReloader(root, true, 0)
+	startReloader(t, r)
+
+	if got := r.State(); got != StateDegraded {
+		t.Fatalf("state with a truncated watch set = %q, want %q", got, StateDegraded)
+	}
+}
+
+// TestStateReportsDegradedWhenRootCannotBeRead pins that a watch set which
+// could not even be discovered is not reported as active coverage.
+func TestStateReportsDegradedWhenRootCannotBeRead(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	t.Cleanup(func() { _ = os.Chmod(root, 0o755) })
+	if err := os.Chmod(root, 0o000); err != nil {
+		t.Fatalf("chmod %s: %v", root, err)
+	}
+	if entries, err := os.ReadDir(root); err == nil {
+		_ = entries
+		t.Skip("directory permissions are not enforced for this user")
+	}
+
+	r := testReloader(root, false, fallbackBudget)
+	startReloader(t, r)
+
+	if got := r.State(); got != StateDegraded {
+		t.Fatalf("state after an undiscoverable watch set = %q, want %q", got, StateDegraded)
+	}
+}
+
+// TestStopWaitsForWatchLoopAndClosesClients pins the managed shutdown
+// contract: Stop returns only after the watch loop ended and every connected
+// WebSocket client was closed, rather than merely signalling the loop.
+func TestStopWaitsForWatchLoopAndClosesClients(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "README.md"))
+
+	r := testReloader(root, true, fallbackBudget)
+	startReloader(t, r)
+
+	server := httptest.NewServer(r.Handle(http.NotFoundHandler()))
+	defer server.Close()
+
+	url := "ws" + strings.TrimPrefix(server.URL, "http") + "/reload_ws?v=" + wsVersion
+	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+	if err != nil {
+		t.Fatalf("dial %s: %v", url, err)
+	}
+	defer func() { _ = conn.Close() }()
+	waitForClients(t, r, 1)
+
+	stopped := make(chan struct{})
+	go func() {
+		r.Stop()
+		close(stopped)
+	}()
+
+	select {
+	case <-stopped:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Stop did not return after the watch loop ended")
+	}
+
+	if err := conn.SetReadDeadline(time.Now().Add(2 * time.Second)); err != nil {
+		t.Fatalf("set read deadline: %v", err)
+	}
+	if _, _, err := conn.ReadMessage(); err == nil {
+		t.Fatal("expected Stop to close the connected WebSocket client")
+	}
+
+	// Stop stays idempotent once the loop is gone.
+	r.Stop()
+}
+
+func waitForClients(t *testing.T, r *Reloader, want int) {
+	t.Helper()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		r.clientsMu.RLock()
+		got := len(r.clients)
+		r.clientsMu.RUnlock()
+		if got == want {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for %d connected clients", want)
+}
+
 // testReloader builds an inactive reloader; call startReloader to run it.
 func testReloader(rootDir string, recursive bool, maxDirs int) *Reloader {
 	r := newReloader(rootDir, recursive, maxDirs)

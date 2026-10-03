@@ -8,8 +8,8 @@
 
 对应 `macos-preview-sessions`；依据 design Decisions 5–8，作为后续原生宿主的前置能力。
 
-- [ ] 1.1 实现隐藏的 `--managed <generation>` 预览启动：在目标 I/O 前建立 stdin 所有权监视，使用真实 `127.0.0.1:0` 监听、v1 NDJSON 和完整初始 URL，提供 204/代次启动确认路由并拒绝不适用的导出组合；验收：scoped TDD 覆盖启动失败不产生 ready、中文/空格单文件 URL 与回环监听，实际启动 Go 验证 HTTP 内容及确认响应，更新 `docs/ARCHITECTURE.md` 的 managed 契约说明。
-- [ ] 1.2 完成 owner EOF/读错误后的取消、独立 2 秒善后 watchdog、有界 HTTP 关闭、watcher 结束等待和 WebSocket 关闭，仅释放已初始化的 PDF 资源；验收：行为回归覆盖 ready 前 owner loss、运行中停止及阻塞启动工作下的退出，真实子进程 smoke 观察 PID/监听消失且不误终止独立 CLI，更新架构文档的所有权与强制退出限制，不声称管理任意 Chrome 后代。
+- [x] 1.1 实现隐藏的 `--managed <generation>` 预览启动：在目标 I/O 前建立 stdin 所有权监视，使用真实 `127.0.0.1:0` 监听、v1 NDJSON 和完整初始 URL，提供 204/代次启动确认路由并拒绝不适用的导出组合；验收：scoped TDD 覆盖启动失败不产生 ready、中文/空格单文件 URL 与回环监听，实际启动 Go 验证 HTTP 内容及确认响应，更新 `docs/ARCHITECTURE.md` 的 managed 契约说明。
+- [x] 1.2 完成 owner EOF/读错误后的取消、独立 2 秒善后 watchdog、有界 HTTP 关闭、watcher 结束等待和 WebSocket 关闭，仅释放已初始化的 PDF 资源；验收：行为回归覆盖 ready 前 owner loss、运行中停止及阻塞启动工作下的退出，真实子进程 smoke 观察 PID/监听消失且不误终止独立 CLI，更新架构文档的所有权与强制退出限制，不声称管理任意 Chrome 后代。
 - [ ] 1.3 为目标访问和 watcher 初始/运行期失败提供结构化状态及初始快照，区分不可访问、真实空目录和热重载降级，不解析日志、不改预算/忽略目录/发现规则、不加轮询；验收：行为测试覆盖空根新增 Markdown、目标删除/移动、监视预算或注册失败及无关资源 404 不污染目标状态，真实请求与文件事件 smoke 观察状态反馈和手动刷新，更新 `README.md` 与架构文档中的降级说明。
 - [ ] 1.4 核实 managed 改动与独立 CLI 共存，保留独立目录/文件、默认端口回退、显式端口严格策略及 `--json` 用法，不在独立模式消费 ownership stdin；验收：更新受影响的行为契约测试并运行对应 Go 测试，实际 CLI 目录/文件预览、端口占用及 owned 服务停止 smoke 均符合各自模式，更新 CLI 使用说明并明确 App-only 回环限制不等于修改独立 CLI 的网络政策。
 

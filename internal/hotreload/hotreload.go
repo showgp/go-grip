@@ -38,6 +38,19 @@ type client struct {
 	mu   sync.Mutex
 }
 
+// State describes what the host may claim about the initial watch coverage.
+type State string
+
+const (
+	// StatePending means the initial watch set has not been registered yet.
+	StatePending State = "pending"
+	// StateActive means the initial watch set covers the served tree.
+	StateActive State = "active"
+	// StateDegraded means setup or the watch budget left part of the tree
+	// unwatched; reloads below it will not trigger.
+	StateDegraded State = "degraded"
+)
+
 type Reloader struct {
 	rootDir   string
 	recursive bool
@@ -46,6 +59,9 @@ type Reloader struct {
 	Upgrader  websocket.Upgrader
 	clients   map[*client]bool
 	clientsMu sync.RWMutex
+	// closed refuses WebSocket upgrades that arrive while Stop is closing
+	// clients, so shutdown cannot leave a hijacked connection behind.
+	closed bool
 
 	// maxFDs bounds what the watch set may consume from the platform resource
 	// (descriptors on kqueue, inotify watches on Linux); the zero value watches
@@ -53,11 +69,20 @@ type Reloader struct {
 	// watch goroutine.
 	maxFDs    int
 	watchCost int
+	// incomplete records that the watch set does not cover the whole served
+	// tree; it is owned by the watch goroutine.
+	incomplete bool
+
+	// state is the initial coverage snapshot reported to the host.
+	stateMu sync.Mutex
+	state   State
 
 	// ready is closed once the initial watch set is registered, and done is
-	// closed by stop to end the watch loop.
+	// closed by stop to end the watch loop. stopped is closed when the watch
+	// loop has returned.
 	ready    chan struct{}
 	done     chan struct{}
+	stopped  chan struct{}
 	stopOnce sync.Once
 }
 
@@ -92,8 +117,10 @@ func newReloader(rootDir string, recursive bool, maxFDs int) *Reloader {
 		Upgrader:  websocket.Upgrader{},
 		clients:   make(map[*client]bool),
 		maxFDs:    maxFDs,
+		state:     StatePending,
 		ready:     make(chan struct{}),
 		done:      make(chan struct{}),
+		stopped:   make(chan struct{}),
 	}
 }
 
@@ -163,15 +190,22 @@ func (w *reloadResponseWriter) Write(b []byte) (int, error) {
 }
 
 func (r *Reloader) watch() {
+	defer close(r.stopped)
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		r.errorLog.Printf("fsnotify error: %s\n", err)
+		r.setState(StateDegraded)
 		close(r.ready)
 		return
 	}
 	defer func() { _ = watcher.Close() }()
 
 	r.register(watcher)
+	if r.incomplete {
+		r.setState(StateDegraded)
+	} else {
+		r.setState(StateActive)
+	}
 	close(r.ready)
 
 	deb := newDebouncer()
@@ -215,14 +249,51 @@ func (r *Reloader) register(watch watchAdder) {
 	_, _ = r.addDirectories(watch, root)
 }
 
+// State reports the watch coverage snapshot for the host integration.
+func (r *Reloader) State() State {
+	r.stateMu.Lock()
+	defer r.stateMu.Unlock()
+	return r.state
+}
+
+func (r *Reloader) setState(state State) {
+	r.stateMu.Lock()
+	r.state = state
+	r.stateMu.Unlock()
+}
+
 // stop ends the watch loop and releases its descriptors.
 func (r *Reloader) stop() {
 	r.stopOnce.Do(func() { close(r.done) })
 }
 
-// Stop ends the watch loop and releases its descriptors. It is safe to call
-// more than once.
-func (r *Reloader) Stop() { r.stop() }
+// Stop ends the watch loop, waits for it to finish, and closes every connected
+// WebSocket client so shutdown does not leave hijacked connections behind. It
+// is safe to call more than once.
+func (r *Reloader) Stop() {
+	r.stop()
+	<-r.stopped
+	r.closeClients()
+}
+
+// closeClients closes all WebSocket connections handed to browsers and refuses
+// upgrades arriving after shutdown.
+func (r *Reloader) closeClients() {
+	r.clientsMu.Lock()
+	clients := make([]*client, 0, len(r.clients))
+	for cl := range r.clients {
+		clients = append(clients, cl)
+	}
+	r.clients = make(map[*client]bool)
+	r.closed = true
+	r.clientsMu.Unlock()
+
+	for _, cl := range clients {
+		cl.mu.Lock()
+		_ = cl.conn.Close()
+		cl.mu.Unlock()
+	}
+}
 
 // handleCreate picks up directories and markdown files that appeared after the
 // initial walk.
@@ -265,6 +336,7 @@ func (r *Reloader) adopt(watch watchAdder, name string, deb *debouncer) {
 	if r.watchCost+cost > r.maxFDs {
 		r.errorLog.Printf("watch %s: the %d entry watch budget is reached; markdown below it will not trigger a reload\n",
 			name, r.maxFDs)
+		r.incomplete = true
 		return
 	}
 	if err := watch.Add(name); err != nil {
@@ -320,6 +392,7 @@ func (r *Reloader) registerDirs(watch watchAdder, root string, plans []dirPlan) 
 		if r.watchCost+plan.cost > r.maxFDs {
 			r.errorLog.Printf("watch %s: %d of %d directories exceed the %d entry watch budget; markdown below the rest will not trigger a reload\n",
 				root, len(plans)-i, len(plans), r.maxFDs)
+			r.incomplete = true
 			break
 		}
 		if err := watch.Add(plan.path); err != nil {
@@ -332,9 +405,11 @@ func (r *Reloader) registerDirs(watch watchAdder, root string, plans []dirPlan) 
 				_ = watch.Remove(plan.path)
 				r.errorLog.Printf("watch budget exhausted: %d of %d directories under %s are unwatched; markdown below them will not trigger a reload\n",
 					len(plans)-i, len(plans), root)
+				r.incomplete = true
 				break
 			}
 			r.errorLog.Printf("watch error at %s: %s\n", plan.path, err)
+			r.incomplete = true
 			continue
 		}
 		r.watchCost += plan.cost
@@ -371,6 +446,7 @@ func (r *Reloader) docPlans(root string) ([]dirPlan, string) {
 		cost, err := dirWatchCost(root)
 		if err != nil {
 			r.errorLog.Printf("walk error at %s: %s\n", root, err)
+			r.incomplete = true
 			return nil, ""
 		}
 		return []dirPlan{{path: root, cost: cost}}, ""
@@ -421,6 +497,9 @@ func (r *Reloader) docPlans(root string) ([]dirPlan, string) {
 	}
 	if walkErrors > 1 {
 		r.errorLog.Printf("%d directories could not be read; markdown below them is not watched\n", walkErrors)
+	}
+	if walkErrors > 0 {
+		r.incomplete = true
 	}
 
 	// Shallowest first, so a truncated watch set still covers the documents
@@ -519,6 +598,11 @@ func (r *Reloader) serveWS(w http.ResponseWriter, req *http.Request) {
 
 	cl := &client{conn: conn}
 	r.clientsMu.Lock()
+	if r.closed {
+		r.clientsMu.Unlock()
+		_ = conn.Close()
+		return
+	}
 	r.clients[cl] = true
 	r.clientsMu.Unlock()
 

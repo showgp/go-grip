@@ -17,6 +17,33 @@ var rootCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		exportFile, _ := cmd.Flags().GetString("export")
 		outputFile, _ := cmd.Flags().GetString("output")
+		browser, _ := cmd.Flags().GetBool("browser")
+		host, _ := cmd.Flags().GetString("host")
+		port, _ := cmd.Flags().GetInt("port")
+		boundingBox, _ := cmd.Flags().GetBool("bounding-box")
+		noReload, _ := cmd.Flags().GetBool("no-reload")
+		recursive, _ := cmd.Flags().GetBool("recursive")
+		jsonOutput, _ := cmd.Flags().GetBool("json")
+
+		var file string
+		if len(args) == 1 {
+			file = args[0]
+		}
+
+		if cmd.Flags().Changed("managed") {
+			managed, _ := cmd.Flags().GetString("managed")
+			return internal.RunManaged(internal.ManagedOptions{
+				Generation:      managed,
+				Target:          file,
+				Recursive:       recursive,
+				EnableReload:    !noReload,
+				BoundingBox:     boundingBox,
+				ExportRequested: exportFile != "" || outputFile != "",
+				JSONRequested:   jsonOutput,
+				HostRequested:   cmd.Flags().Changed("host"),
+				PortRequested:   cmd.Flags().Changed("port"),
+			})
+		}
 
 		if exportFile != "" {
 			data, err := os.ReadFile(exportFile)
@@ -59,19 +86,6 @@ var rootCmd = &cobra.Command{
 			return nil
 		}
 
-		browser, _ := cmd.Flags().GetBool("browser")
-		host, _ := cmd.Flags().GetString("host")
-		port, _ := cmd.Flags().GetInt("port")
-		boundingBox, _ := cmd.Flags().GetBool("bounding-box")
-		noReload, _ := cmd.Flags().GetBool("no-reload")
-		recursive, _ := cmd.Flags().GetBool("recursive")
-		jsonOutput, _ := cmd.Flags().GetBool("json")
-
-		var file string
-		if len(args) == 1 {
-			file = args[0]
-		}
-
 		parser := internal.NewParser()
 		server := internal.NewServerWithOptions(internal.ServerOptions{
 			Host:         host,
@@ -105,4 +119,6 @@ func init() {
 	rootCmd.Flags().String("export", "", "Export a Markdown file as standalone HTML and exit")
 	rootCmd.Flags().String("output", "", "Output file path (used with --export; default: stdout)")
 	rootCmd.Flags().Bool("json", false, "Output server info as JSON to stdout on startup")
+	rootCmd.Flags().String("managed", "", "Run as the macOS host managed preview service (internal)")
+	_ = rootCmd.Flags().MarkHidden("managed")
 }
