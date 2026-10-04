@@ -22,6 +22,17 @@ macos-run:  ## Build and run macOS App in Debug mode
 	  CODE_SIGN_IDENTITY="" CODE_SIGNING_ALLOWED=NO build
 	open macos/build/Debug/GoGrip.app
 
+.PHONY: macos-test
+macos-test:  ## Run macOS host adapter behavior tests (real Go, logic test bundle)
+	mkdir -p macos/.build/test
+	go build -o macos/.build/test/go-grip .
+	rm -rf /tmp/gogrip-managed-test-tool
+	mkdir -p /tmp/gogrip-managed-test-tool/GoGrip.app/Contents/MacOS
+	cp macos/.build/test/go-grip /tmp/gogrip-managed-test-tool/GoGrip.app/Contents/MacOS/go-grip
+	xcodebuild -project macos/GoGrip.xcodeproj -scheme GoGrip \
+	  -configuration Debug -destination 'platform=macOS' \
+	  CODE_SIGN_IDENTITY="" CODE_SIGNING_ALLOWED=NO test
+
 .PHONY: macos-clean
 macos-clean:  ## Clean macOS build artifacts
 	xcodebuild -project macos/GoGrip.xcodeproj -scheme GoGrip \

@@ -1,6 +1,7 @@
 vendor
 result
 bin
+macos/.build
 .codewhale
 .deepseek
 /go-grip

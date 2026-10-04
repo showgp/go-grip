@@ -7,6 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		03F1E2D400000000000000B1 /* ManagedProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03F1E2D400000000000000A6 /* ManagedProtocol.swift */; };
+		03F1E2D400000000000000B2 /* ManagedProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03F1E2D400000000000000A7 /* ManagedProcess.swift */; };
+		03F1E2D400000000000000B3 /* ManagedProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03F1E2D400000000000000A6 /* ManagedProtocol.swift */; };
+		03F1E2D400000000000000B4 /* ManagedProcess.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03F1E2D400000000000000A7 /* ManagedProcess.swift */; };
+		03F1E2D400000000000000B5 /* ManagedProtocolTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03F1E2D400000000000000A3 /* ManagedProtocolTests.swift */; };
+		03F1E2D400000000000000B6 /* ManagedProcessTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03F1E2D400000000000000A4 /* ManagedProcessTests.swift */; };
+		03F1E2D400000000000000B7 /* ManagedProcessGoIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 03F1E2D400000000000000A5 /* ManagedProcessGoIntegrationTests.swift */; };
 		1027A4D1C09A90A42DAC4E77 /* PopoverView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60382E34A2F1723AF0CB5E3B /* PopoverView.swift */; };
 		195E1534C2C5F6286D2FAC29 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 271A5F2B6364A10D897B29A4 /* SettingsView.swift */; };
 		5D774EABF25C6380835C48A5 /* Storage.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5526CF1E7DA86939577F8D4 /* Storage.swift */; };
@@ -46,6 +53,12 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		03F1E2D400000000000000A1 /* GoGripTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = GoGripTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		03F1E2D400000000000000A3 /* ManagedProtocolTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedProtocolTests.swift; sourceTree = "<group>"; };
+		03F1E2D400000000000000A4 /* ManagedProcessTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedProcessTests.swift; sourceTree = "<group>"; };
+		03F1E2D400000000000000A5 /* ManagedProcessGoIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedProcessGoIntegrationTests.swift; sourceTree = "<group>"; };
+		03F1E2D400000000000000A6 /* ManagedProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedProtocol.swift; sourceTree = "<group>"; };
+		03F1E2D400000000000000A7 /* ManagedProcess.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManagedProcess.swift; sourceTree = "<group>"; };
 		12D6792AD00EDE0FC87A2E40 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		271A5F2B6364A10D897B29A4 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		2777745FD028D3C073B12BB2 /* HistoryEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryEntry.swift; sourceTree = "<group>"; };
@@ -100,13 +113,26 @@
 			children = (
 				B7C19184BEE39277C0A42987 /* GoGrip.app */,
 				B2ABADB9E055BA6457745841 /* GoGripFinderSync.appex */,
+				03F1E2D400000000000000A1 /* GoGripTests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		03F1E2D400000000000000A2 /* GoGripTests */ = {
+			isa = PBXGroup;
+			children = (
+				03F1E2D400000000000000A3 /* ManagedProtocolTests.swift */,
+				03F1E2D400000000000000A4 /* ManagedProcessTests.swift */,
+				03F1E2D400000000000000A5 /* ManagedProcessGoIntegrationTests.swift */,
+			);
+			path = GoGripTests;
 			sourceTree = "<group>";
 		};
 		C3D0FB6AAB575194E46EFBEC /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				03F1E2D400000000000000A6 /* ManagedProtocol.swift */,
+				03F1E2D400000000000000A7 /* ManagedProcess.swift */,
 				4A1675E1F2CF7A31CC1EDB35 /* ProcessManager.swift */,
 			);
 			path = Services;
@@ -139,6 +165,7 @@
 			children = (
 				CE0328FC9DAB32ADD2196373 /* GoGrip */,
 				2C198F125C9D388B830BDAF7 /* GoGripFinderSync */,
+				03F1E2D400000000000000A2 /* GoGripTests */,
 				63DC20E08AAC5BDF43EEB23F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -146,6 +173,23 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		03F1E2D400000000000000C1 /* GoGripTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 03F1E2D400000000000000C5 /* Build configuration list for PBXNativeTarget "GoGripTests" */;
+			buildPhases = (
+				03F1E2D400000000000000C2 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = GoGripTests;
+			packageProductDependencies = (
+			);
+			productName = GoGripTests;
+			productReference = 03F1E2D400000000000000A1 /* GoGripTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		7B763C6F54B0E0F7C419D213 /* GoGripFinderSync */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 7BB95E8E12CA9F60C6539A4E /* Build configuration list for PBXNativeTarget "GoGripFinderSync" */;
@@ -210,6 +254,7 @@
 			targets = (
 				91CCEAA3A0A0B6EAED3C9E8A /* GoGrip */,
 				7B763C6F54B0E0F7C419D213 /* GoGripFinderSync */,
+				03F1E2D400000000000000C1 /* GoGripTests */,
 			);
 		};
 /* End PBXProject section */
@@ -255,10 +300,24 @@
 				CF87A9EB81C929A3DFF16813 /* HistoryEntry.swift in Sources */,
 				B5F2C207410D975EE8E4E39C /* HistoryListView.swift in Sources */,
 				B3E6D602B743B8C5A2EE569B /* HistoryRowView.swift in Sources */,
+				03F1E2D400000000000000B1 /* ManagedProtocol.swift in Sources */,
+				03F1E2D400000000000000B2 /* ManagedProcess.swift in Sources */,
 				1027A4D1C09A90A42DAC4E77 /* PopoverView.swift in Sources */,
 				90A8A4B575DAFD2276969B99 /* ProcessManager.swift in Sources */,
 				195E1534C2C5F6286D2FAC29 /* SettingsView.swift in Sources */,
 				5D774EABF25C6380835C48A5 /* Storage.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		03F1E2D400000000000000C2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				03F1E2D400000000000000B3 /* ManagedProtocol.swift in Sources */,
+				03F1E2D400000000000000B4 /* ManagedProcess.swift in Sources */,
+				03F1E2D400000000000000B5 /* ManagedProtocolTests.swift in Sources */,
+				03F1E2D400000000000000B6 /* ManagedProcessTests.swift in Sources */,
+				03F1E2D400000000000000B7 /* ManagedProcessGoIntegrationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -472,9 +531,60 @@
 			};
 			name = Release;
 		};
+		03F1E2D400000000000000C3 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_IDENTITY = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.showgp.GoGripTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		03F1E2D400000000000000C4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGN_IDENTITY = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.showgp.GoGripTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		03F1E2D400000000000000C5 /* Build configuration list for PBXNativeTarget "GoGripTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				03F1E2D400000000000000C3 /* Debug */,
+				03F1E2D400000000000000C4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		326EADACC254E5F05C327A17 /* Build configuration list for PBXNativeTarget "GoGrip" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

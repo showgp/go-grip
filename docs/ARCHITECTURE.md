@@ -340,7 +340,20 @@ Markdown 原始文本 ([]byte)
 - `target-status` 只来自实际访问：目录目标按根目录级可访问性判定（根读取失败才是 unavailable），单文件目标按所选文件可读常规文件判定；目录内单篇文章或无关资源（图片、不存在子页面）的失败保持原 HTTP 错误，不翻转目标状态，也不显示为空目录。原路径再次访问成功可报告 `available`，但不后台寻找新位置、不轮询、不重连卷、不自动重启或恢复 watcher。
 - managed 专属固定路由 `HEAD/GET /__gogrip/ready` 返回 204 + `X-GoGrip-Generation`，不访问目标、不渲染正文，供宿主启动确认。
 - owner loss 后取消运行，并在独立 watchdog 的 2 秒善后期限后强制退出（绕过 defer），不等阻塞的文件系统操作或启动函数返回；正常取消路径依次执行有界 HTTP 关闭（1s Shutdown 后必要时 Close）、`hotreload.Stop()`（等待 watch 循环结束并关闭 WebSocket 客户端）、仅释放已初始化的 PDF 资源（停止不会创建 headless Chrome）、释放 listener。
-- 限制：强制退出依赖内核回收 listener/watcher 描述符；不管理 Chrome 等任意后代进程；不对不可中断的内核 I/O 承诺精确硬截止；宿主侧的 CLOEXEC 检查与 4 秒 SIGKILL 兜底由 Swift 适配器任务负责。
+- 限制：强制退出依赖内核回收 listener/watcher 描述符；不管理 Chrome 等任意后代进程；不对不可中断的内核 I/O 承诺精确硬截止。宿主侧的 descriptor 所有权与停止见下节。
+
+### Swift 宿主进程适配器（macOS 端）
+
+`macos/GoGrip/Services/ManagedProtocol.swift`（v1 解码/校验）与 `ManagedProcess.swift`（进程适配器）是生产 Foundation 启动路径：一次 launch 对应一个生成代次与一个确切 owned child，不另建会话字典，也不复用旧管理器的端口/回退逻辑。AppKit/Finder 接线仍属后续任务，当前由行为测试与临时 Foundation 拥有者直接调用。
+
+- 启动：`Process.executableURL` + 参数数组 `--managed <generation>`（目录附 `-r`，目标前 `--`），不经 shell；独立 CLI 的参数、端口与 `--json` 政策不受影响。
+- 每个 child 有独立 stdin Pipe；在进程级串行的 launch 临界区内创建 descriptor，并对宿主持有的非 stdio 端（stdin 写端、stdout/stderr 读端）设置并复核 `FD_CLOEXEC`；writer 不复制、不传给其他进程。
+- 连续消费 UTF-8 v1 NDJSON：跨读取分片、跨多字节 UTF-8 字符与同次读取多帧；校验 `version=1`、`generation`、必要字段及嵌套 `reload`/`target` 形状，未知事件或非法状态直接判失败（不做降级解析）。stdout 未完成帧残余与单个完整帧、stderr 诊断留存各上限 64 KiB（保留最新尾部，失败时的诊断尾部为尽力而为），诊断不参与机器状态判断；ready 之后继续消费 reload/target/fatal/退出，运行期解码/校验违规以带代次事件报告并终止该 child，不静默停读。
+- 启动自创建 child 起 15 秒内部期限，覆盖机器反馈与一次 same-origin HEAD（`/__gogrip/ready`）：仅当 URL 为 `http://127.0.0.1:<实际端口>`、HEAD 返回 204、`X-GoGrip-Generation` 匹配、响应 origin 未跳转且进程仍存活时才成功。无效/缺失反馈、EOF、超时、早退或 HEAD 失败均报告失败（不猜 6419）并收尾本次 child。
+- 停止：关闭该 child 的专用 writer 并等待真实退出；4 秒后仍存活的确切 owned pid 使用 SIGKILL，结果携带实际退出状态。协调器的单个/全部、启动中停止与重复停止语义属后续任务。
+- 通道释放：宿主持有的三个通道端在不依赖实例释放的情况下关闭——stdin writer 在停止或 child 真实退出时关闭；stdout/stderr 读端在读到 EOF 后立即关闭；未产生 child 的启动失败（`Process.run` 抛错或 CLOEXEC 检查失败）显式释放本次全部 Pipe。真实 Go 启动失败路径按“保留每个失败实例”统计本进程 `/dev/fd` FIFO 计数，验证失败启动不累积通道 descriptor。
+- 已用同一生产 launch 路径验证（真实 Go，任务 2.1/2.5）：目录、中文+空格单文件与空目录的实际 URL/内容；Go fatal 与适配器判定失败的清理；双会话停止只影响对应 child；独立 CLI 隔离；临时 Foundation 拥有者在 ready 前（spawned 回调内自 SIGKILL，确定性先于 readiness 校验）与运行中宿主 SIGKILL 后 child 退出、端口释放；双会话宿主 SIGKILL 后两个 owned child 均退出；`ps` 记录的 argv 与 `lsof` 记录的真实监听。
+- 未验证/限制：尚未接入 AppKit/Finder/TCC 或候选包（任务 3–7）；未在 Intel 或 macOS 13 实际运行；不对不可中断内核 I/O 承诺硬截止，不管理 Chrome 等后代进程。构建/测试入口 `make macos-test` 将 Go 工具复制到系统卷临时 bundle 后运行 xctest——仓库位于外置卷时 xctest 进程无法打开该卷文件（open 阻塞），且 xcodebuild 不转发自定义环境变量；生产宿主的确定内置路径（`Contents/MacOS/go-grip`）仍属 05/10。
 
 ## 八、Markdown 扩展体系
 
