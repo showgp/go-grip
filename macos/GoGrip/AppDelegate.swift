@@ -1,161 +1,133 @@
 import AppKit
-import SwiftUI
 import Combine
+import SwiftUI
 
-class AppDelegate: NSObject, NSApplicationDelegate {
-    var statusItem: NSStatusItem!
-    var popover: NSPopover!
-    var processManager: ProcessManager!
-    private var cancellables = Set<AnyCancellable>()
+/// Strongly-held AppKit root of the menu bar host: it owns the single
+/// production coordinator (through the app model), the status item and the
+/// popover, and defers application termination until every owned preview
+/// service confirmed its real exit.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private(set) var model: PreviewAppModel!
+    private var alertPresenter: AppAlertPresenter!
+    private var servicesProvider: FinderServiceProvider!
+    private var statusItem: NSStatusItem!
+    private var popover: NSPopover!
+    private var failureAlertCancellable: AnyCancellable?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        processManager = ProcessManager()
+        // The single deterministic bundled tool location; there is no
+        // Resources, PATH or source-tree fallback.
+        let toolURL = Bundle.main.bundleURL
+            .appendingPathComponent("Contents/MacOS/go-grip")
+        let coordinator = PreviewSessionCoordinator(executableURL: toolURL)
+        let alertPresenter = AppAlertPresenter()
+        self.alertPresenter = alertPresenter
+        model = PreviewAppModel(
+            coordinator: coordinator,
+            browser: WorkspaceBrowserOpening(),
+            confirmation: alertPresenter,
+            recentStore: RecentTargetsStore(),
+            loginItem: MainAppLoginItem()
+        )
+
+        // Failure reports are owned by the root, not by the panel: a cold
+        // started Services request can fail before the panel was ever shown,
+        // and the user still has to learn about it. One native summary per
+        // published report through the shared single-alert slot, independent
+        // of popover visibility; the panel keeps listing the same report. The
+        // slot presents modelessly, so a Services request arriving while the
+        // alert is visible is still serviced, and a second report waits for
+        // the visible alert instead of stacking. Deferred by one main-queue
+        // turn so the alert is never presented inside the publishing call
+        // stack.
+        failureAlertCancellable = model.$lastOperationFailures
+            .filter { !$0.isEmpty }
+            .sink { failures in
+                Task { @MainActor in alertPresenter.presentFailureReport(failures) }
+            }
+
+        // The only Services provider is registered after the coordinator and
+        // the batch entry above exist: the system may deliver the first
+        // request immediately, before the panel was ever shown, and an early
+        // request must not meet an unready root.
+        servicesProvider = FinderServiceProvider(model: model)
+        NSApp.servicesProvider = servicesProvider
 
         setupStatusItem()
         setupPopover()
-        setupBadgeObserver()
 
-        NSApp.servicesProvider = self
-        NSUpdateDynamicServices()
+        // First-use Finder/Services guidance: presented once from its own
+        // dedicated flag. It never gates provider registration or the panel,
+        // and the panel's Help entry re-presents it without writing this flag
+        // or touching any session or recent-target state.
+        let guidanceStore = FirstUseGuidanceStore()
+        if guidanceStore.shouldPresent() {
+            guidanceStore.markPresented()
+            alertPresenter.presentServiceGuidance()
+        }
     }
 
+    /// Quit path: refuse new opens and browser requests first, then stop every
+    /// recorded owned service, including ones still starting, and reply only
+    /// after each one confirmed its real exit. Closing the panel or this
+    /// callback never stops anything by itself; a forced termination is
+    /// covered by the per-child ownership pipe instead.
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let model else { return .terminateNow }
+        if model.beginTermination() {
+            return .terminateNow
+        }
+        Task { @MainActor in
+            let mayExit = await model.completeTermination()
+            NSApp.reply(toApplicationShouldTerminate: mayExit)
+        }
+        return .terminateLater
+    }
+
+    @MainActor
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             button.image = NSImage(systemSymbolName: "doc.text", accessibilityDescription: "GoGrip")
+            button.target = self
             button.action = #selector(togglePopover(_:))
         }
     }
 
+    @MainActor
     private func setupPopover() {
         popover = NSPopover()
-        popover.contentSize = NSSize(width: 400, height: 280)
-        popover.behavior = .applicationDefined
-        popover.animates = true
-
-        let popoverView = PopoverView(
-            processManager: processManager,
-            onDragStateChange: { [weak self] dragging in
-                self?.popover.behavior = dragging ? .applicationDefined : .applicationDefined
-            },
-            onSizeChange: { [weak self] size in
-                guard let self, size.height >= 200 else { return }
-                let capped = NSSize(
-                    width: max(360, min(size.width, 480)),
-                    height: max(200, min(size.height, 800))
-                )
-                self.popover.contentSize = capped
-            }
+        // Tall enough for the session rows with their full state reasons, the
+        // recent list and the failure report; the content scrolls inside.
+        let contentSize = NSSize(width: 420, height: 460)
+        popover.contentSize = contentSize
+        popover.behavior = .transient
+        let hosting = NSHostingController(
+            rootView: PopoverView(
+                coordinator: model.coordinator,
+                model: model,
+                onHelp: { [weak self] in self?.alertPresenter.presentServiceGuidance() }
+            )
         )
-        popover.contentViewController = NSHostingController(rootView: popoverView)
+        // Keep the fixed content size above instead of letting AppKit resize
+        // the popover from SwiftUI content, which could reposition the panel
+        // away from the status item (for example with an empty session list).
+        hosting.sizingOptions = []
+        popover.contentViewController = hosting
     }
 
-    private func setupBadgeObserver() {
-        processManager.objectWillChange
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.updateBadge(count: self?.processManager.count ?? 0)
-            }
-            .store(in: &cancellables)
-    }
-
-    func applicationWillTerminate(_ notification: Notification) {
-        processManager.stopAll()
-    }
-
-    // MARK: - Services
-
-    @objc func openWithGoGrip(
-        _ pboard: NSPasteboard,
-        userData: String,
-        error: AutoreleasingUnsafeMutablePointer<NSString>
-    ) {
-        guard let urls = pboard.readObjects(forClasses: [NSURL.self], options: [
-            .urlReadingFileURLsOnly: true
-        ]) as? [URL], let url = urls.first else {
-            error.pointee = "No file URL provided" as NSString
-            return
+    @MainActor
+    @objc private func togglePopover(_ sender: AnyObject?) {
+        guard let button = statusItem.button else { return }
+        if popover.isShown {
+            popover.performClose(sender)
+        } else {
+            // The login-start status belongs to the system: re-read it every
+            // time the panel is shown, so a change made in System Settings is
+            // reflected without an app restart.
+            model.refreshLoginItemStatus()
+            popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+            popover.contentViewController?.view.window?.makeKey()
         }
-
-        let path = url.path
-        openPath(path)
-    }
-
-    // MARK: - URL Scheme Handler
-
-    func application(_ application: NSApplication, open urls: [URL]) {
-        for url in urls {
-            guard url.scheme == "gogrip" else { continue }
-            guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-                  let pathItem = components.queryItems?.first(where: { $0.name == "path" }),
-                  let path = pathItem.value else { continue }
-
-            openPath(path)
-        }
-    }
-
-    // MARK: - Path Validation & Opening
-
-    private func openPath(_ path: String) {
-        var isDir: ObjCBool = false
-        let exists = FileManager.default.fileExists(atPath: path, isDirectory: &isDir)
-        let isMarkdown = path.hasSuffix(".md")
-        guard exists, isDir.boolValue || isMarkdown else { return }
-
-        Task {
-            await processManager.start(path: path)
-            if let port = processManager.port(for: path),
-               let url = URL(string: "http://localhost:\(port)") {
-                await MainActor.run { NSWorkspace.shared.open(url) }
-            }
-        }
-    }
-
-    @objc func togglePopover(_ sender: AnyObject?) {
-        if let button = statusItem.button {
-            if popover.isShown {
-                popover.performClose(sender)
-            } else {
-                popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            }
-        }
-    }
-
-    func updateBadge(count: Int) {
-        guard let button = statusItem.button,
-              let image = NSImage(systemSymbolName: "doc.text", accessibilityDescription: "GoGrip") else {
-            return
-        }
-
-        if count > 0 {
-            let badgeImage = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
-                let circleRect = NSRect(x: 8, y: 8, width: 18, height: 18)
-                NSColor.red.setFill()
-                NSBezierPath(ovalIn: circleRect).fill()
-
-                let text = "\(count)" as NSString
-                let attrs: [NSAttributedString.Key: Any] = [
-                    .font: NSFont.systemFont(ofSize: 11, weight: .bold),
-                    .foregroundColor: NSColor.white,
-                ]
-                let textSize = text.size(withAttributes: attrs)
-                let textRect = NSRect(
-                    x: circleRect.midX - textSize.width / 2,
-                    y: circleRect.midY - textSize.height / 2,
-                    width: textSize.width,
-                    height: textSize.height
-                )
-                text.draw(in: textRect, withAttributes: attrs)
-                return true
-            }
-            image.lockFocus()
-            badgeImage.draw(at: .zero, from: .zero, operation: .sourceOver, fraction: 1.0)
-            image.unlockFocus()
-        }
-
-        if count == 0 {
-            image.isTemplate = true
-        }
-        button.image = image
     }
 }

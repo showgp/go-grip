@@ -1,5 +1,7 @@
 # GoGrip macOS App 实施方案
 
+> 状态（2026-10-05）：本文是旧示例 App 的实施方案记录，所描述的拖拽/历史/Finder Sync/嵌入 Resources 链路已从工程移除；旧历史存储源（`Models/HistoryEntry.swift`、`Utilities/Storage.swift`）与旧 `StorageTests.swift` 已随任务 09 移除，其 50 项历史与拖拽界面未在新宿主保留。当前宿主按 `openspec/changes/rebuild-macos-preview-app` 重建，能力与边界以 `docs/ARCHITECTURE.md` 第七节和 `README.md` 为准。
+
 > 创建日期: 2026-06-03
 > 基于: [macos-app-plan.md](macos-app-plan.md)
 > 状态: 待实施

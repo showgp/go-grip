@@ -1,5 +1,7 @@
 # GoGrip macOS 状态栏 App 实现方案
 
+> 状态（2026-10-05）：本文是旧示例 App 的设计记录，其拖拽/历史/Finder Sync/嵌入 Resources 方案已被替换（旧历史存储源与测试已随任务 09 移除，用户旧 50 项数据保留但不被新宿主读取）；当前宿主按 `openspec/changes/rebuild-macos-preview-app` 重建，能力与边界以 `docs/ARCHITECTURE.md` 第七节和 `README.md` 为准。
+
 > 创建日期: 2026-06-03
 > 最后更新: 2026-06-03（Review 修复后）
 > 状态: 设计完成，待实现

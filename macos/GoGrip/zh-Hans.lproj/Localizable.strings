@@ -1,0 +1,76 @@
+/* GoGrip 应用界面 — 简体中文。
+   键是代码中的英文原文；机器诊断（Go code/message、target/reload reason、
+   路径、URL、协议细节）不在此翻译，始终保留原文。 */
+
+/* 菜单栏面板 */
+"Sessions" = "会话";
+"No preview sessions" = "暂无预览会话";
+"Recent" = "最近目标";
+"Clear" = "清空";
+"No recent targets" = "暂无最近目标";
+"Open…" = "打开…";
+"Help" = "帮助";
+"Stop All" = "全部停止";
+"Quit" = "退出";
+"Open in Browser" = "在浏览器中打开";
+"Copy URL" = "拷贝 URL";
+"Stop" = "停止";
+"Open" = "打开";
+"Target unavailable: %@" = "目标不可用：%@";
+"Browser: %@" = "浏览器：%@";
+"Hot reload: preparing" = "热重载：准备中";
+"Hot reload degraded: %@" = "热重载已降级：%@";
+"Hot reload: off" = "热重载：已关闭";
+"Starting" = "正在启动";
+"Running" = "运行中";
+"Stopping" = "正在停止";
+"Stopped" = "已停止";
+"the available reason was not reported" = "未报告可用原因";
+
+/* 可选登录启动（任务 5.3） */
+"Launch at login" = "登录时启动";
+"Not set" = "未开启";
+"Enabled" = "已开启";
+"Waiting for approval" = "等待批准";
+"Unavailable" = "不可用";
+"Turn On" = "开启";
+"Turn Off" = "关闭";
+"Open Login Items…" = "打开登录项设置…";
+"GoGrip can launch at login only after you allow it in System Settings → General → Login Items." = "需要在“系统设置”→“通用”→“登录项”中允许 GoGrip，才能登录时启动。";
+"Could not change the login startup setting: %@" = "无法更改登录启动设置：%@";
+
+/* 原生提示 */
+"OK" = "好";
+"Cancel" = "取消";
+"Open %ld previews?" = "打开 %ld 个预览？";
+"GoGrip will open %ld distinct targets and ask the default browser for each one." = "GoGrip 将打开 %ld 个不同目标，并分别为每个目标请求默认浏览器。";
+
+/* 首次及再次查看的 Finder/Services 引导 */
+"Using GoGrip from Finder" = "在 Finder 中使用 GoGrip";
+"In Finder, select one or more folders or Markdown files, then choose Services → Open with GoGrip from the context menu; the preview opens in your default browser." = "在 Finder 中选中一个或多个目录或 Markdown 文件，然后从右键菜单的“服务”子菜单中选择“用 GoGrip 打开”；预览会在默认浏览器中打开。";
+"If the command is not there, check System Settings → Keyboard → Keyboard Shortcuts… → Services and make sure GoGrip's service is enabled." = "如果菜单里没有这个命令，请打开“系统设置”→“键盘”→“键盘快捷键…”→“服务”，确认 GoGrip 的服务已启用。";
+"GoGrip opens what macOS allows it to access. Ordinary targets need no extra permission; if macOS asks while opening a target, allow the GoGrip app to access it under Privacy & Security → Files and Folders." = "GoGrip 只能打开 macOS 允许它访问的内容；普通目标无需额外授权。如果打开目标时系统询问，请在“隐私与安全性”→“文件与文件夹”中允许 GoGrip 访问。";
+"You can also open a target from this panel with Open…, and reopen this guide any time with Help." = "也可以在本面板中点“打开…”选择目标；之后随时点“帮助”可再次查看本说明。";
+
+/* 失败与生命周期包装句；占位符后的内容为原始诊断，不翻译。 */
+"The system could not open the default browser for the preview" = "系统无法为预览打开默认浏览器";
+"The preview service did not confirm its exit" = "预览服务未确认已退出";
+"The application is quitting" = "应用正在退出";
+"The previous session has not stopped" = "上一个会话尚未停止";
+"The preview coordinator was released before the launch completed" = "启动完成前预览协调器已释放";
+"The launch was superseded before it started" = "本次启动在开始前已被取代";
+"The session was stopped before it started" = "会话在启动前已停止";
+"The session was stopped while starting" = "会话在启动过程中已停止";
+"The preview service exited before it could be reported" = "预览服务在状态可报告之前已退出";
+"Stop did not confirm exit: %@" = "停止未确认退出：%@";
+"Protocol violation: %@" = "协议违规：%@";
+"The preview service exited unexpectedly (status %d)" = "预览服务意外退出（状态 %d）";
+"Check the target's permissions, the volume's mount or sharing state, and — when macOS asked for authorization — System Settings → Privacy & Security → Files and Folders (GoGrip's entry)." = "请检查目标的文件/文件夹权限、所在卷的挂载或共享状态；如果 macOS 曾请求授权，请检查“系统设置”→“隐私与安全性”→“文件与文件夹”中的 GoGrip 条目。";
+"The preview service could not start: %@" = "预览服务无法启动：%@";
+"The preview service sent invalid startup feedback: %@" = "预览服务发送了无效的启动反馈：%@";
+"The preview service reported %@: %@" = "预览服务报告 %@：%@";
+"The preview service exited during startup (status %d)" = "预览服务在启动期间退出（状态 %d）";
+"The preview service did not become ready within the startup deadline" = "预览服务未在启动期限内就绪";
+"The preview service did not confirm readiness: %@" = "预览服务未确认就绪：%@";
+"Only directories and Markdown files can be previewed" = "只能预览目录和 Markdown 文件";
+"The service request did not contain a readable file" = "服务请求中没有可读取的文件";

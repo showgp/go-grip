@@ -1,4 +1,4 @@
-.PHONY: build test run macos macos-run macos-clean dmg
+.PHONY: build test run macos macos-run macos-clean
 
 build:
 	go build -o go-grip .
@@ -10,17 +10,15 @@ run:
 	go run . $(ARGS)
 
 .PHONY: macos
-macos:  ## Build macOS App (GoGrip.app)
+macos:  ## Build macOS App (GoGrip.app, ad-hoc signed development build)
 	xcodebuild -project macos/GoGrip.xcodeproj -scheme GoGrip \
-	  -configuration Release \
-	  CODE_SIGN_IDENTITY="" CODE_SIGNING_ALLOWED=NO build
+	  -configuration Release -derivedDataPath macos/.build/DerivedData build
 
 .PHONY: macos-run
 macos-run:  ## Build and run macOS App in Debug mode
 	xcodebuild -project macos/GoGrip.xcodeproj -scheme GoGrip \
-	  -configuration Debug \
-	  CODE_SIGN_IDENTITY="" CODE_SIGNING_ALLOWED=NO build
-	open macos/build/Debug/GoGrip.app
+	  -configuration Debug -derivedDataPath macos/.build/DerivedData build
+	open macos/.build/DerivedData/Build/Products/Debug/GoGrip.app
 
 .PHONY: macos-test
 macos-test:  ## Run macOS host adapter behavior tests (real Go, logic test bundle)
@@ -31,20 +29,8 @@ macos-test:  ## Run macOS host adapter behavior tests (real Go, logic test bundl
 	cp macos/.build/test/go-grip /tmp/gogrip-managed-test-tool/GoGrip.app/Contents/MacOS/go-grip
 	xcodebuild -project macos/GoGrip.xcodeproj -scheme GoGrip \
 	  -configuration Debug -destination 'platform=macOS' \
-	  CODE_SIGN_IDENTITY="" CODE_SIGNING_ALLOWED=NO test
+	  -derivedDataPath macos/.build/DerivedData test
 
 .PHONY: macos-clean
 macos-clean:  ## Clean macOS build artifacts
-	xcodebuild -project macos/GoGrip.xcodeproj -scheme GoGrip \
-	  -configuration Release clean
-	xcodebuild -project macos/GoGrip.xcodeproj -scheme GoGrip \
-	  -configuration Debug clean
-
-.PHONY: dmg
-dmg: macos  ## Create DMG from built app (requires release build)
-	mkdir -p dmg-root
-	cp -R macos/build/Release/GoGrip.app dmg-root/
-	ln -s /Applications dmg-root/Applications
-	hdiutil create -volname "GoGrip" -srcfolder dmg-root \
-	  -ov -format UDZO GoGrip.dmg
-	rm -rf dmg-root
+	rm -rf macos/.build/DerivedData

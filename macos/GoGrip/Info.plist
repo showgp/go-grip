@@ -18,5 +18,30 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMessage</key>
+			<string>openWithGoGrip</string>
+			<key>NSPortName</key>
+			<string>GoGrip</string>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Open with GoGrip</string>
+			</dict>
+			<key>NSSendTypes</key>
+			<array>
+				<string>public.file-url</string>
+			</array>
+			<key>NSRequiredContext</key>
+			<dict>
+				<key>NSApplicationIdentifier</key>
+				<string>com.apple.finder</string>
+			</dict>
+		</dict>
+	</array>
 </dict>
 </plist>

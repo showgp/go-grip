@@ -1,0 +1,3 @@
+/* Finder“服务”菜单中的名称 — 简体中文。
+   键与 Info.plist 中 NSMenuItem.default 的精确默认值一致。 */
+"Open with GoGrip" = "用 GoGrip 打开";

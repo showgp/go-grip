@@ -1,0 +1,79 @@
+/* GoGrip app interface — English (development region).
+   Keys are the exact English source strings used by the code; this
+   localization keeps them verbatim. Raw diagnostics (Go codes/messages,
+   target/reload reasons, paths, URLs, protocol details) are never listed
+   here and stay verbatim in every language. */
+
+/* Menu bar panel */
+"Sessions" = "Sessions";
+"No preview sessions" = "No preview sessions";
+"Recent" = "Recent";
+"Clear" = "Clear";
+"No recent targets" = "No recent targets";
+"Open…" = "Open…";
+"Help" = "Help";
+"Stop All" = "Stop All";
+"Quit" = "Quit";
+"Open in Browser" = "Open in Browser";
+"Copy URL" = "Copy URL";
+"Stop" = "Stop";
+"Open" = "Open";
+"Target unavailable: %@" = "Target unavailable: %@";
+"Browser: %@" = "Browser: %@";
+"Hot reload: preparing" = "Hot reload: preparing";
+"Hot reload degraded: %@" = "Hot reload degraded: %@";
+"Hot reload: off" = "Hot reload: off";
+"Starting" = "Starting";
+"Running" = "Running";
+"Stopping" = "Stopping";
+"Stopped" = "Stopped";
+"the available reason was not reported" = "the available reason was not reported";
+
+/* Opt-in login startup (task 5.3) */
+"Launch at login" = "Launch at login";
+"Not set" = "Not set";
+"Enabled" = "Enabled";
+"Waiting for approval" = "Waiting for approval";
+"Unavailable" = "Unavailable";
+"Turn On" = "Turn On";
+"Turn Off" = "Turn Off";
+"Open Login Items…" = "Open Login Items…";
+"GoGrip can launch at login only after you allow it in System Settings → General → Login Items." = "GoGrip can launch at login only after you allow it in System Settings → General → Login Items.";
+"Could not change the login startup setting: %@" = "Could not change the login startup setting: %@";
+
+/* Native alerts */
+"OK" = "OK";
+"Cancel" = "Cancel";
+"Open %ld previews?" = "Open %ld previews?";
+"GoGrip will open %ld distinct targets and ask the default browser for each one." = "GoGrip will open %ld distinct targets and ask the default browser for each one.";
+
+/* First-use and revisited Finder/Services guidance */
+"Using GoGrip from Finder" = "Using GoGrip from Finder";
+"In Finder, select one or more folders or Markdown files, then choose Services → Open with GoGrip from the context menu; the preview opens in your default browser." = "In Finder, select one or more folders or Markdown files, then choose Services → Open with GoGrip from the context menu; the preview opens in your default browser.";
+"If the command is not there, check System Settings → Keyboard → Keyboard Shortcuts… → Services and make sure GoGrip's service is enabled." = "If the command is not there, check System Settings → Keyboard → Keyboard Shortcuts… → Services and make sure GoGrip's service is enabled.";
+"GoGrip opens what macOS allows it to access. Ordinary targets need no extra permission; if macOS asks while opening a target, allow the GoGrip app to access it under Privacy & Security → Files and Folders." = "GoGrip opens what macOS allows it to access. Ordinary targets need no extra permission; if macOS asks while opening a target, allow the GoGrip app to access it under Privacy & Security → Files and Folders.";
+"You can also open a target from this panel with Open…, and reopen this guide any time with Help." = "You can also open a target from this panel with Open…, and reopen this guide any time with Help.";
+
+/* Failure and lifecycle wrappers; the verbatim part after each placeholder is
+   a raw diagnostic and is never translated. */
+"The system could not open the default browser for the preview" = "The system could not open the default browser for the preview";
+"The preview service did not confirm its exit" = "The preview service did not confirm its exit";
+"The application is quitting" = "The application is quitting";
+"The previous session has not stopped" = "The previous session has not stopped";
+"The preview coordinator was released before the launch completed" = "The preview coordinator was released before the launch completed";
+"The launch was superseded before it started" = "The launch was superseded before it started";
+"The session was stopped before it started" = "The session was stopped before it started";
+"The session was stopped while starting" = "The session was stopped while starting";
+"The preview service exited before it could be reported" = "The preview service exited before it could be reported";
+"Stop did not confirm exit: %@" = "Stop did not confirm exit: %@";
+"Protocol violation: %@" = "Protocol violation: %@";
+"The preview service exited unexpectedly (status %d)" = "The preview service exited unexpectedly (status %d)";
+"Check the target's permissions, the volume's mount or sharing state, and — when macOS asked for authorization — System Settings → Privacy & Security → Files and Folders (GoGrip's entry)." = "Check the target's permissions, the volume's mount or sharing state, and — when macOS asked for authorization — System Settings → Privacy & Security → Files and Folders (GoGrip's entry).";
+"The preview service could not start: %@" = "The preview service could not start: %@";
+"The preview service sent invalid startup feedback: %@" = "The preview service sent invalid startup feedback: %@";
+"The preview service reported %@: %@" = "The preview service reported %@: %@";
+"The preview service exited during startup (status %d)" = "The preview service exited during startup (status %d)";
+"The preview service did not become ready within the startup deadline" = "The preview service did not become ready within the startup deadline";
+"The preview service did not confirm readiness: %@" = "The preview service did not confirm readiness: %@";
+"Only directories and Markdown files can be previewed" = "Only directories and Markdown files can be previewed";
+"The service request did not contain a readable file" = "The service request did not contain a readable file";

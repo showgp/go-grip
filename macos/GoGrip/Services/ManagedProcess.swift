@@ -91,7 +91,7 @@ struct ManagedDiagnosticsTail {
 /// another session dictionary, guesses a port or reuses the legacy manager's
 /// success rules.
 final class ManagedProcess: @unchecked Sendable {
-    enum TargetMode: Equatable {
+    enum TargetMode: String, Equatable, Codable {
         case directory
         case file
     }
