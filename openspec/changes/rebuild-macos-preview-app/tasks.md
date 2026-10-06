@@ -52,10 +52,10 @@
 
 依赖第 5 组；对应 `macos-app-packaging`；依据 design Decision 10。第 3 组的可运行开发包不代替本组候选产物。
 
-- [ ] 6.1 完成唯一 Xcode 工程的 universal 宿主与内置 Go 构建，显式 `arm64 x86_64`、`ONLY_ACTIVE_ARCH=NO`、macOS 13 deployment 和 `CGO_ENABLED=0` 的 darwin 双架构工具，移除仅宿主或仅工具 universal 的假设；验收：实际构建并用 Mach-O 架构/部署信息检查两者，运行产出的 App 与真实 Go 预览，相关 Swift/Go 行为套件通过，更新 `Makefile` 对应的构建说明及架构文档，不新增拷贝/文件存在测试。
-- [ ] 6.2 统一显式 archive 输出、内置工具独立 code identifier 的 ad-hoc 签名与宿主签名，以及从该 archive App 生成含 Applications 安装入口的候选 DMG，不猜测旧 `macos/build/Release` 路径；验收：实际 archive/DMG 流程与签名结构检查通过，从候选包取出的 App 脱离源码和开发 PATH 仍能打开目标，无运行时 chmod 或 CLI 路径回退，更新候选安装、信任提示及打包命令说明。
-- [ ] 6.3 更新相关 macOS CI 构建与产物交付，使 App/DMG 作为候选 artifact 而非自动正式 Release，保持独立 CLI release 资产流程不变、不引入 Developer ID/公证凭据要求；验收：实际执行同等构建/归档/行为测试命令并检查候选产物，确认 App 路径不自动发布正式资产，更新 CI/候选分发说明，不用流水线源文本或转发测试代替构建证据，不代用户推送或运行发布。
-- [ ] 6.4 完成随候选交付的使用与切换说明：退出旧宿主/停止旧会话、避免重复 bundle 安装、新历史不自动迁移但旧数据保留、手动回退到明确旧版本或独立 CLI，以及正式签名公证另行安排；验收：按文档的候选构建/使用步骤实际完成打开和停止，文档不宣称旧示例可靠、所有 CLI 已限本机或候选已正式发布就绪，更新现有 `README.md`/架构及相关旧计划的状态说明，不进行主规格同步或归档。
+- [x] 6.1 完成唯一 Xcode 工程的 universal 宿主与内置 Go 构建，显式 `arm64 x86_64`、`ONLY_ACTIVE_ARCH=NO`、macOS 13 deployment 和 `CGO_ENABLED=0` 的 darwin 双架构工具，移除仅宿主或仅工具 universal 的假设；验收：实际构建并用 Mach-O 架构/部署信息检查两者，运行产出的 App 与真实 Go 预览，相关 Swift/Go 行为套件通过，更新 `Makefile` 对应的构建说明及架构文档，不新增拷贝/文件存在测试。
+- [x] 6.2 统一显式 archive 输出、内置工具独立 code identifier 的 ad-hoc 签名与宿主签名，以及从该 archive App 生成含 Applications 安装入口的候选 DMG，不猜测旧 `macos/build/Release` 路径；验收：实际 archive/DMG 流程与签名结构检查通过，从候选包取出的 App 脱离源码和开发 PATH 仍能打开目标，无运行时 chmod 或 CLI 路径回退，更新候选安装、信任提示及打包命令说明。
+- [x] 6.3 更新相关 macOS CI 构建与产物交付，使 App/DMG 作为候选 artifact 而非自动正式 Release，保持独立 CLI release 资产流程不变、不引入 Developer ID/公证凭据要求；验收：实际执行同等构建/归档/行为测试命令并检查候选产物，确认 App 路径不自动发布正式资产，更新 CI/候选分发说明，不用流水线源文本或转发测试代替构建证据，不代用户推送或运行发布。
+- [x] 6.4 完成随候选交付的使用与切换说明：退出旧宿主/停止旧会话、避免重复 bundle 安装、新历史不自动迁移但旧数据保留、手动回退到明确旧版本或独立 CLI，以及正式签名公证另行安排；验收：按文档的候选构建/使用步骤实际完成打开和停止，文档不宣称旧示例可靠、所有 CLI 已限本机或候选已正式发布就绪，更新现有 `README.md`/架构及相关旧计划的状态说明，不进行主规格同步或归档。
 
 ## 7. 候选产物跨组件功能验收
 

@@ -9,10 +9,10 @@ export PATH="/opt/homebrew/bin:/usr/local/go/bin:$PATH"
 cd "${SRCROOT}/.."
 
 echo "Building go-grip for arm64..."
-GOOS=darwin GOARCH=arm64 go build -o /tmp/go-grip-arm64 .
+CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o /tmp/go-grip-arm64 .
 
 echo "Building go-grip for amd64..."
-GOOS=darwin GOARCH=amd64 go build -o /tmp/go-grip-amd64 .
+CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o /tmp/go-grip-amd64 .
 
 TOOL="${BUILT_PRODUCTS_DIR}/${CONTENTS_FOLDER_PATH}/MacOS/go-grip"
 echo "Creating universal binary at ${TOOL}..."

@@ -1,6 +1,6 @@
 # 12 — 自包含 Universal 候选 App/DMG 与候选 CI 交付
 
-Status: open
+Status: done
 Blocked by: 10-localized-service-guidance, 11-opt-in-login-start
 Covers OpenSpec tasks: 6.1, 6.2, 6.3, 6.4
 Behavior source: ../specs/macos-app-packaging/spec.md, ../specs/macos-finder-service/spec.md, ../specs/macos-menu-bar-app/spec.md, ../specs/macos-preview-sessions/spec.md
@@ -93,21 +93,40 @@ Proposal source: ../proposal.md
 
 ## Acceptance
 
-- [ ] 10 的 5.1/5.2 与 11 的 5.3 完整交付并独立 Standards/Spec 确认，无未决 scope decision；12 的范围、现有套件、候选 smoke 和具体环境操作已获另行批准，最终资源/接口重新盘点且未覆盖其他会话工作。
-- [ ] 唯一 Xcode 工程实际构建 universal 宿主，显式 arm64/x86_64、ONLY_ACTIVE_ARCH=NO、macOS deployment 13.0；darwin Go 双架构构建显式 CGO_ENABLED=0，并合并在唯一 Contents/MacOS/go-grip 路径。
-- [ ] 对 archive 中的宿主和 Go 每个 slice 记录实际 Mach-O 架构/最低系统信息，与 macOS 13 声明兼容；本机真实运行通过，未以静态检查或交叉编译宣称 Intel/macOS 13 实际运行已验收。
-- [ ] 先独立 identifier ad-hoc 签工具、再 Xcode 签宿主；archive 与交付包取出的 App 签名结构检查通过，不依赖 Developer ID/公证凭据，不在运行时 chmod/重签。
-- [ ] 明确且统一 archive 输出，由该 archive App 生成实际含完整 App 与 Applications 安装入口的候选 DMG；候选 App artifact 的归档/取出保留包结构、执行权限与签名，不猜测旧 build/Release 或运行另一轮开发 App。
-- [ ] 取出的候选 App 脱离源码/构建目录及开发 PATH，经真实 native 手动入口打开目录、中文/空格 Markdown 文件，包内实际 Go、正确回环 URL 与默认浏览器对应内容得到配对证据，无 CLI/Resources/源码 fallback。
-- [ ] 按文档在获准环境验证该候选的 Finder Services 冷启动到正确页面，不把旧副本、声明或重扫当证明；候选消费最终引导、完整语言资源与真实登录状态，无旧扩展/专用转发，不自动修改系统服务或登录偏好。
-- [ ] 从候选按文档实际停止/正常退出，owned PID 与端口释放；关闭 UI 不停止，其他 owned/独立 CLI 按既有契约隔离，无进程名清扫、用户数据删除或自动服务恢复，回退入口明确且受批准边界约束。
-- [ ] 相关 macOS CI 与本地同等构建/归档/签名/打包/已有行为检查命令实际执行通过，App/DMG 仅走候选 artifact，App 自动正式 Release 上传已切断；CLI release job/资产/tag 流程不变，本地等价验证与实际远端上传证据明确区分，不代用户推送或发布。
-- [ ] README/架构与相关旧计划状态说明随候选更新，实际按候选构建/使用步骤完成打开和停止；升级/回退、旧数据保留、新历史不迁移、重复 bundle 安装风险、信任提示与 ad-hoc 限制准确，候选与 CLI 正式资产说明分开。
-- [ ] 相关现有 Go/Swift 行为套件通过；不新增文字/默认值/文件存在/资源拷贝/YAML/纯转发测试，不重新固化旧 incidental 断言；临时检查或 smoke 脚本移除，最终候选不含受控 fake 或开发替代工具。
-- [ ] 全部本票必要验收、真实证据及独立 Standards/Spec 审阅完成后才关闭 12 并更新 6.1–6.4；08/3.3 网络共享和 13/7.1–7.3 候选矩阵缺口保留，不宣称整变更完成、正式分发就绪或已获同步/归档/发布许可。
+- [x] 10 的 5.1/5.2 与 11 的 5.3 完整交付并独立 Standards/Spec 确认，无未决 scope decision；12 的范围、现有套件、候选 smoke 和具体环境操作已获另行批准，最终资源/接口重新盘点且未覆盖其他会话工作。
+- [x] 唯一 Xcode 工程实际构建 universal 宿主，显式 arm64/x86_64、ONLY_ACTIVE_ARCH=NO、macOS deployment 13.0；darwin Go 双架构构建显式 CGO_ENABLED=0，并合并在唯一 Contents/MacOS/go-grip 路径。
+- [x] 对 archive 中的宿主和 Go 每个 slice 记录实际 Mach-O 架构/最低系统信息，与 macOS 13 声明兼容；本机真实运行通过，未以静态检查或交叉编译宣称 Intel/macOS 13 实际运行已验收。
+- [x] 先独立 identifier ad-hoc 签工具、再 Xcode 签宿主；archive 与交付包取出的 App 签名结构检查通过，不依赖 Developer ID/公证凭据，不在运行时 chmod/重签。
+- [x] 明确且统一 archive 输出，由该 archive App 生成实际含完整 App 与 Applications 安装入口的候选 DMG；候选 App artifact 的归档/取出保留包结构、执行权限与签名，不猜测旧 build/Release 或运行另一轮开发 App。
+- [x] 取出的候选 App 脱离源码/构建目录及开发 PATH，经真实 native 手动入口打开目录、中文/空格 Markdown 文件，包内实际 Go、正确回环 URL 与默认浏览器对应内容得到配对证据，无 CLI/Resources/源码 fallback。
+- [x] 按文档在获准环境验证该候选的 Finder Services 冷启动到正确页面，不把旧副本、声明或重扫当证明；候选消费最终引导、完整语言资源与真实登录状态，无旧扩展/专用转发，不自动修改系统服务或登录偏好。
+- [x] 从候选按文档实际停止/正常退出，owned PID 与端口释放；关闭 UI 不停止，其他 owned/独立 CLI 按既有契约隔离，无进程名清扫、用户数据删除或自动服务恢复，回退入口明确且受批准边界约束。
+- [x] 相关 macOS CI 与本地同等构建/归档/签名/打包/已有行为检查命令实际执行通过，App/DMG 仅走候选 artifact，App 自动正式 Release 上传已切断；CLI release job/资产/tag 流程不变，本地等价验证与实际远端上传证据明确区分，不代用户推送或发布。
+- [x] README/架构与相关旧计划状态说明随候选更新，实际按候选构建/使用步骤完成打开和停止；升级/回退、旧数据保留、新历史不迁移、重复 bundle 安装风险、信任提示与 ad-hoc 限制准确，候选与 CLI 正式资产说明分开。
+- [x] 相关现有 Go/Swift 行为套件通过；不新增文字/默认值/文件存在/资源拷贝/YAML/纯转发测试，不重新固化旧 incidental 断言；临时检查或 smoke 脚本移除，最终候选不含受控 fake 或开发替代工具。
+- [x] 全部本票必要验收、真实证据及独立 Standards/Spec 审阅完成后才关闭 12 并更新 6.1–6.4；08/3.3 网络共享和 13/7.1–7.3 候选矩阵缺口保留，不宣称整变更完成、正式分发就绪或已获同步/归档/发布许可。
 
 ## Whole-change coverage checkpoint
 
 [完整覆盖地图](../coverage-plan.md) 逐项保留全部 **26 个 OpenSpec checkbox、30 个 requirement、68 个 scenario**；每项区分已发布贡献和未来规划，不因当前已发布票结束而提前勾选仍有其他贡献者的任务。
 
 本轮只新增 **12-universal-candidate**，完整映射 **6.1–6.4**，状态 open、待审阅，10/11 实施前置尚未满足。01–07、09 done；08 open/网络共享待补证；10/11 open，发布确认不代表实现确认；13-candidate-functional-acceptance 仍为未发布规划。当前账本 **15/26** 不变，批准 artifacts、既有票及全部任务勾选不在本轮变更范围内。
+
+## Closure record
+
+- 关闭：2026-10-06，状态 `done`；12 项验收全部按实际证据通过（见 `## Acceptance` 勾选）。实施批准：用户显式批准本票范围（6.1–6.4 一体；不新增永久测试，沿用 `go test ./...` 与 `make macos-test` 作为缝）、候选 smoke 与具体环境操作（`/Applications` 备份后替换并保留候选、候选 DMG 挂载/解包、候选面板与 Finder 真实操作、Finder 触发自动化；不推送/不触发远端，CI 仅本地等价验证）。
+- 前置复核：10、11 均 `Status: done` 且关闭记录含独立 Standards/Spec 审阅、无未决 scope；tasks.md 5.1/5.2/5.3 已勾（开工时点 18/26）；13 已发布未实施，7.1–7.3 不属本票。
+- 变更面（10 个文件）：`Makefile`（CANDIDATE_* + macos-archive/macos-dmg/macos-candidate/macos-candidate-check 统一入口；macos-clean 覆盖 macos/.build）、`macos/Scripts/build-go-grip.sh`（两处 `CGO_ENABLED=0`）、`macos/GoGrip.xcodeproj/project.pbxproj`（App target Release 显式 `ARCHS=(arm64,x86_64)`、`ONLY_ACTIVE_ARCH=NO`；Debug 保持单架构）、`.github/workflows/build.yml`（macOS PR job → `make macos-test` + `make macos-candidate` + upload-artifact）、`.github/workflows/release.yml`（App job 去禁签覆盖与 gh-release 上传、job 级 `contents: read`、改 upload-artifact；CLI release job 未改）、`README.md`（候选章节 + Releasing 分离 + TOC 锚点；ditto 解包、ad-hoc 信任、Services 启用可能需重建后重勾）、`docs/ARCHITECTURE.md`（第十六节候选构建/CI-CD；旧状态文字日期化前向引用）、`docs/HANDOVER.md`/`docs/macos-app-impl.md`/`docs/macos-app-plan.md`（日期化状态说明，旧 tag 自动正式 DMG 路径标注为被替换）。
+- 构建与静态证据（本机 macOS 27.0.1 arm64；Xcode 27.0/27A266a；Go 1.26.3；git `4e99fbe`）：`make macos-candidate` 成功，archive `macos/.build/GoGrip.xcarchive`，产物 `GoGrip.app.zip`（sha256 `f5c821df…`）与 `GoGrip.dmg`（`91af28d6…`）；宿主与 `Contents/MacOS/go-grip` 均 `x86_64 arm64` 且 `LC_BUILD_VERSION` minos 为 13.0/12.0，两个 thin slice 的 `go version -m` 均含 `CGO_ENABLED=0`；工具 `com.showgp.GoGrip.go-grip` 先独立 ad-hoc 签、宿主 `com.showgp.GoGrip` 后签，`codesign --verify --strict` 通过；无 `.appex`/framework，`en.lproj`/`zh-Hans.lproj` 在包内；DMG 挂载含完整 App 与 `Applications → /Applications`，挂载内与 ditto 取出后签名/可执行位保留，zip 解包同理。`macos-candidate-check` 架构检查为精确 `lipo <bin> -verify_arch arm64/x86_64`（负控制：arm64-only 副本被拒，exit 1）。
+- 真实 smoke（同一候选；`/Applications/GoGrip.app` 由 DMG 安装，工具 sha256 与 archive 一致；替换前 11 开发构建备份于 `~/Desktop/GoGrip-backups/GoGrip-11-backup.app`）：
+  - 面板路径（受控环境：系统 launchd 启动、`PATH=/usr/bin:/bin:/usr/sbin:/sbin`、App 位于源码/构建目录之外）：原生 NSOpenPanel 打开 `/tmp/gogrip-smoke`（目录）与 `/tmp/gogrip-smoke/中文 空格 文档.md`（单文件）→ 两个 owned child 均为包内 `go-grip --managed`（PID 93214/93376，端口 54530/54677），Chrome 实际标签页与 `SMOKE-NESTED-MARKER`/`SMOKE-FILE-MARKER` 内容配对；关闭面板后会话继续服务；面板 Stop 仅释放对应 child/端口；Quit 释放全部 owned；独立 CLI（6419, `--browser=false`）在 stop/quit 前后持续 200。
+  - Finder 冷启动（宿主未运行、不以登录启动为前提）：Finder 激活并选中 `/tmp/gogrip-smoke/文档目录` → Services → Open with GoGrip（真实 Finder 菜单；服务启用由用户在 System Settings 勾选，pbs 无禁用条目，`com.apple.ServicesMenu.Services.plist` 条目指向 `/Applications/GoGrip.app`；仅当 Finder 为前台时该必需上下文服务才出现在菜单）；系统启动进程路径实测 `/Applications/GoGrip.app/Contents/MacOS/GoGrip`（KERN_PROCARGS2，非备份/DerivedData 副本）；owned child `--managed 4A2FC618-… -r -- /tmp/gogrip-smoke/文档目录`（PID 95274，端口 56564）；Chrome 打开 `http://127.0.0.1:56564/子目录/中文%20笔记.md` 且内容含 `SMOKE-NESTED-MARKER`；面板显示该 Finder 会话；面板 Stop 释放 child/端口、Quit 退出宿主，独立 CLI 不受影响。
+  - 候选消费最终 10/11 表面：首启由候选展示英文首次引导；面板显示真实登录状态 `Not set`、Recent 与 Open/Clear、Help/Stop All 等控制；语言资源为 en/zh-Hans 且英文环境实际观察。
+  - 观察方式披露：面板/Finder 操作为 AX 与受控鼠标事件驱动的真实原生 UI；候选 Help 再次查看未单独复现（同一候选首启引导内容已观察）。
+- 行为套件：`go test ./...` 通过（首轮出现一次与本次改动无关的既有 managed 测试 flake，随后单测与全量重复运行均通过）；`make macos-test` **95 tests / 0 failures**；`gofmt -l .` 干净；Go/Swift 源码零改动。
+- CI 交付：两条 macOS 路径改为同等 `make macos-test` + `make macos-candidate` 并以 workflow artifact 交付；App 自动正式 Release 上传已切断；CLI release job/资产/tag 流程未改；YAML 解析通过；本轮按批准仅本地等价执行（未推送、未触发远端，不宣称上传已观察）。
+- 独立只读审阅：Standards 与 Spec 两轴分别独立执行（首轮 `reviewer` 代理遇 provider 限额失败，按用户要求更换模型重跑主审阅；此前 fallback 只读代理的增量复审结论一并保留）。最终 **Standards 0 阻塞 / 1 P3 advisory（`macos-archive` 使用默认 DerivedData，接受并记录）/ 0 scope**；**Spec 0 阻塞 / 0 未决**（2 项 advisory 均解决：README TOC 锚点随标题修正；Finder 现在时陈述由本票冷启动实测闭环）。修复后经复审确认，无未决阻塞或范围裁决。
+- 保留的缺口/边界：08/3.3 保持 open/未勾；13/7.1–7.3（Intel/macOS 13 实际运行、候选级复用/浏览器关闭/异常退出矩阵、候选简体中文界面）未实施；远端 CI 未运行；候选 Help 重看与浏览器标签关闭未单独观察。候选 ad-hoc 身份下 Services 启用可能需每次重建后重勾（已写入 README）。
+- 环境与用户数据：`/Applications/GoGrip.app` 为本次候选（保留）；Services 启用（用户操作）保留并指向该候选；登录项、系统语言、TCC、用户卷未由本票修改；smoke 产生的候选 defaults 键（首次引导、最近目标、面板 UI 状态）已清理以还原会话前状态，旧 `go-grip-history` 未动；smoke 目标目录、临时脚本与截图已清理。
+- tasks.md：本票完整交付并验证 **6.1、6.2、6.3、6.4** 并勾选；08/3.3 与 13/7.1–7.3 未勾，其他票/任务未变。
+- 未覆盖：未提交/推送、未同步主规格、未归档、未发布；未开始 13。

@@ -42,9 +42,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build Swift App
-        run: |
-          xcodebuild -project macos/GoGrip.xcodeproj \
-            -scheme GoGrip -configuration Release \
-            CODE_SIGN_IDENTITY="" CODE_SIGNING_ALLOWED=NO \
-            build
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: Run macOS host behavior suite
+        run: make macos-test
+
+      - name: Build candidate App and DMG
+        run: make macos-candidate
+
+      - name: Upload candidate App and DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: GoGrip-macos-candidate
+          path: |
+            macos/.build/candidate/GoGrip.app.zip
+            macos/.build/candidate/GoGrip.dmg

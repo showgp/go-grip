@@ -501,6 +501,10 @@
 		ACEF9BF41B3403A34696B8CC /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ARCHS = (
+					arm64,
+					x86_64,
+				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "-";
 				COMBINE_HIDPI_IMAGES = YES;
@@ -510,6 +514,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
+				ONLY_ACTIVE_ARCH = NO;
 				PRODUCT_BUNDLE_IDENTIFIER = com.showgp.GoGrip;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.0;

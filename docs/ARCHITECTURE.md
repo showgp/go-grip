@@ -353,7 +353,7 @@ Markdown 原始文本 ([]byte)
 - 停止：关闭该 child 的专用 writer 并等待真实退出；4 秒后仍存活的确切 owned pid 使用 SIGKILL，结果携带实际退出状态。会话协调器（下节）在其上提供单个/全部、启动中停止与重复停止语义。
 - 通道释放：宿主持有的三个通道端在不依赖实例释放的情况下关闭——stdin writer 在停止或 child 真实退出时关闭；stdout/stderr 读端在读到 EOF 后立即关闭；未产生 child 的启动失败（`Process.run` 抛错或 CLOEXEC 检查失败）显式释放本次全部 Pipe。真实 Go 启动失败路径按“保留每个失败实例”统计本进程 `/dev/fd` FIFO 计数，验证失败启动不累积通道 descriptor。
 - 已用同一生产 launch 路径验证（真实 Go，任务 2.1/2.5）：目录、中文+空格单文件与空目录的实际 URL/内容；Go fatal 与适配器判定失败的清理；双会话停止只影响对应 child；独立 CLI 隔离；临时 Foundation 拥有者在 ready 前（spawned 回调内自 SIGKILL，确定性先于 readiness 校验）与运行中宿主 SIGKILL 后 child 退出、端口释放；双会话宿主 SIGKILL 后两个 owned child 均退出；`ps` 记录的 argv 与 `lsof` 记录的真实监听。
-- 未验证/限制：已挂载网络卷的实际访问（任务 3.3 该场景本轮无共享，保持未完成）及候选 DMG/universal/支持环境（任务 6–7）仍未接入；TCC 实际主体与受保护/外接卷访问已由 08 在本机开发构建验证（见“Swift 应用根”的 08 记录）；Finder Services 已由 07 的开发 App 接通（见“Swift 应用根”）。AppKit 应用根与确定内置路径（`Contents/MacOS/go-grip`）已由 05 的开发 App 接通；未在 Intel 或 macOS 13 实际运行；不对不可中断内核 I/O 承诺硬截止，不管理 Chrome 等后代进程。构建/测试入口 `make macos-test` 将 Go 工具复制到系统卷临时 bundle 后运行 xctest——仓库位于外置卷时 xctest 进程无法打开该卷文件（open 阻塞），且 xcodebuild 不转发自定义环境变量。
+- 未验证/限制：已挂载网络卷的实际访问（任务 3.3 该场景本轮无共享，保持未完成）及候选 DMG/universal/支持环境（任务 6–7）仍未接入（2026-10-06 更新：候选打包已由任务 12 交付，见第十六节；支持环境实际矩阵仍属任务 13）；TCC 实际主体与受保护/外接卷访问已由 08 在本机开发构建验证（见“Swift 应用根”的 08 记录）；Finder Services 已由 07 的开发 App 接通（见“Swift 应用根”）。AppKit 应用根与确定内置路径（`Contents/MacOS/go-grip`）已由 05 的开发 App 接通；未在 Intel 或 macOS 13 实际运行；不对不可中断内核 I/O 承诺硬截止，不管理 Chrome 等后代进程。构建/测试入口 `make macos-test` 将 Go 工具复制到系统卷临时 bundle 后运行 xctest——仓库位于外置卷时 xctest 进程无法打开该卷文件（open 阻塞），且 xcodebuild 不转发自定义环境变量。
 
 ### Swift 会话协调器（macOS 端）
 
@@ -366,7 +366,7 @@ Markdown 原始文本 ([]byte)
 - 停止：经适配器关闭该 child 的 ownership writer 并等待真实退出，仍存活的确切 owned child 沿用 4 秒 SIGKILL 兜底；重复停止共享同一次真实收尾；停止失败保留实际失败与管理入口（可重试），不以删行伪装退出；停止未确认期间的重开只重试收尾或报告失败、不启动重叠 generation；不自动重启、不恢复 watcher、不迁移路径、不影响独立 CLI。
 - 显式停止不记为意外退出；运行期退出结束 running 并保留可获得原因（fatal/协议违规原因在退出前保存）。`target-status`/`reload-status` 与执行阶段分开：目标不可访问或热重载降级不删除仍运行会话的 URL 与管理入口，也不伪造空目录。
 - 已用临时 Foundation 拥有者调用生产协调器 → 生产 `ManagedProcess` → 当前 Go 验证（任务 2.2/2.4）：原路径与符号链接并发复用同一会话/PID/generation；父/子/文件三个独立会话与递归边界；单个停止后对应 PID 退出且端口不再服务、其他会话继续；启动中停止（观察到 spawned 且协调器仍 starting）等待真实退出且迟到启动结果不恢复 running；真实子进程意外退出后不再 running、原因可查看且不自动重启；目标被移动后保留会话并真实报告 unavailable；Markdown 命名的 FIFO 在准备阶段按实际类型拒绝、不可读的常规 Markdown 目标得到真实 Go fatal 原因；独立 CLI 在 stop all 前后继续提供内容。
-- 未验证/限制：候选包（任务 6–7）仍未接通；登录项已由任务 5.3 接通（见“Swift 应用根”的 5.3 记录）；首次引导与完整简中/英文本地化已由任务 5.1/5.2 接通（见“Swift 应用根”的 10 记录）；最近记录/完整面板已由任务 4.1–4.3 接通（见“Swift 应用根”记录）；TCC/受保护与卷访问已由 08 接通（见“Swift 应用根”的 08 记录）；Finder 入口已由 07 接通并复用本协调器。元数据准备尚未完成、还未成为会话的请求不在 `stopAll` 取消范围内——退出路径的“禁止新启动”由 05 的准入关闭（`stopAcceptingNewOpens`，含准备完成后才到达的请求）处理，批次先 `prepareBatch` 再 `open(prepared:)` 也不改变这一点；不管理 Chrome 后代；未在 Intel 或 macOS 13 实际运行。
+- 未验证/限制：候选包（任务 6–7）仍未接通（2026-10-06 更新：候选打包已由任务 12 交付，见第十六节）；登录项已由任务 5.3 接通（见“Swift 应用根”的 5.3 记录）；首次引导与完整简中/英文本地化已由任务 5.1/5.2 接通（见“Swift 应用根”的 10 记录）；最近记录/完整面板已由任务 4.1–4.3 接通（见“Swift 应用根”记录）；TCC/受保护与卷访问已由 08 接通（见“Swift 应用根”的 08 记录）；Finder 入口已由 07 接通并复用本协调器。元数据准备尚未完成、还未成为会话的请求不在 `stopAll` 取消范围内——退出路径的“禁止新启动”由 05 的准入关闭（`stopAcceptingNewOpens`，含准备完成后才到达的请求）处理，批次先 `prepareBatch` 再 `open(prepared:)` 也不改变这一点；不管理 Chrome 后代；未在 Intel 或 macOS 13 实际运行。
 
 ### Swift 应用根、面板与真实退出（macOS 端）
 
@@ -374,7 +374,7 @@ Markdown 原始文本 ([]byte)
 
 - 入口与所有权：`@main` enum 直接创建 `NSApplication`、强持有 `AppDelegate` 并 `run`；`applicationDidFinishLaunching` 依次创建唯一生产协调器与批次入口（`PreviewAppModel`）、唯一 `FinderServiceProvider` 并赋值 `NSApp.servicesProvider`，随后才建立 status item/popover。关闭面板只影响显示，不停止会话；本层不新增第二份运行事实源。注册顺序是有意的：系统可能在 provider 注册后立即投递首个服务请求（早于首次面板展示），因此注册时协调器与批次依赖必须已可用，且请求处理不依赖面板可见。
 - Finder Services 入口（任务 3.1/3.2/3.4 的 Services 贡献）：`Info.plist` 仅一项 `NSServices` 声明——`NSMessage=openWithGoGrip`、`NSPortName=GoGrip`、`NSMenuItem.default=Open with GoGrip`、`NSSendTypes=[public.file-url]`、`NSRequiredContext.NSApplicationIdentifier=com.apple.finder`；不设返回类型或快捷键、不写回 pasteboard、不解析文本/shell、不保留旧 Finder Sync 或专用 URL 转发。`openWithGoGrip:userData:error:` 用 `readObjects(forClasses:[NSURL.self], options:[.urlReadingFileURLsOnly:true])` 在返回前同步取得本次全部 file URL（不只 first），随即把 URL 值（而非 pasteboard）交给同一 `PreviewAppModel.openBatch` 并立即返回；`error` 指针只在返回前用于“请求中没有任何可读文件”这类即时错误，目标/启动/浏览器错误仍归批次的一次原生报告，异步阶段不重读 pasteboard。去重、5/6 数量确认、部分失败继续与汇总、默认浏览器、退出准入全部复用 05/06 的同一路径，Services 只增加输入入口、不建立第二套事实源或启动入口。
-- 内置工具：宿主只从 `Bundle.main.bundleURL/Contents/MacOS/go-grip` 加载；开发构建脚本 `macos/Scripts/build-go-grip.sh` 构建双架构工具到该确定位置并 ad-hoc 签名（独立 code identifier `com.showgp.GoGrip.go-grip`），Xcode 再 ad-hoc 签宿主 bundle。运行期不回退 Resources/PATH/源码，不 runtime chmod。该开发构建是开发/验收入口，不代表 universal/签名公证/候选 DMG 或支持环境证明（任务 6–7）。
+- 内置工具：宿主只从 `Bundle.main.bundleURL/Contents/MacOS/go-grip` 加载；开发构建脚本 `macos/Scripts/build-go-grip.sh` 构建双架构工具到该确定位置并 ad-hoc 签名（独立 code identifier `com.showgp.GoGrip.go-grip`），Xcode 再 ad-hoc 签宿主 bundle。运行期不回退 Resources/PATH/源码，不 runtime chmod。该开发构建是开发/验收入口，不代表 universal/签名公证/候选 DMG 或支持环境证明（任务 6–7；2026-10-06 更新：候选打包与静态架构检查已由任务 12 完成，见第十六节）。
 - 批次入口（任务 2.3）：面板 `Open…` 用 `NSOpenPanel`（目录/`.md` 多选）把全部所选 URL 交给唯一生产批次入口 `PreviewAppModel.openBatch`。该入口先经协调器 `prepareBatch` 在后台准备并按规范化身份去重、收集不可打开项；去重后的不同有效目标超过 5 个时，才用原生确认（`AppAlertPresenter.confirmOpening`，显示实际数量、非模态并以 continuation 等待响应）询问，用户取消或退出准入已关闭时不建立任何记录、子进程或浏览器请求，也不停止既有会话。获准后按选择顺序逐项 `await` 协调器 `open(prepared:)`（同一记录/代次/单飞/停止机制，不重复准备、不建立批内并发或第二份运行模型），仅对已验证 running 会话请求 `NSWorkspace` 打开实际 URL；单项失败不阻断后项。
 - 报告与恢复（任务 2.3）：批次结束时把不支持、准备/启动及浏览器失败汇总成一份 `lastOperationFailures`（目标 + 可获得原因）。该报告由**应用根**在每次非空发布时用一次原生 NSAlert 呈现（经一次主队列转派交共享的单槽 `AppAlertPresenter`），与面板是否可见无关——冷启动的 Services 请求在面板从未展示时也能立即感知失败；面板会话列表下方保留同一份可查看清单。失败报告与数量确认共用该槽：同一时刻最多一个提示，失败报告按到达顺序各呈现一次，提示为非模态窗口而不进入 app-modal 会话（见下方 2026-10-06 修正记录）。全部成功不发布报告也不额外提示，报告不改变会话阶段/URL/PID/管理入口。单项操作（面板重开浏览器、退出未确认，以及退出准入期间中断批次后已收集的失败）仍发布单条/汇总报告并同样由根呈现一次。被拒绝的浏览器请求照旧记录为会话 `browserFailure` 并保留 running/URL，重开成功即清除；`NSWorkspace.open` 返回 true 只表示系统接受请求，不证明页面已渲染。
 - 退出准入：`applicationShouldTerminate` 先执行 `PreviewAppModel.beginTermination()`：置 `isTerminating` 并调用协调器 `stopAcceptingNewOpens()`（一次性；准备完成后才到达的打开请求同样被拒绝），随后 `completeTermination()` 等待 `stopAll`（含 starting）确认真实退出，全部 terminated 才回复允许退出；未确认的停止保留会话与管理入口并拒绝退出。强杀不经过该回调，由每个 child 的 ownership 管道负责。
@@ -401,7 +401,7 @@ Markdown 原始文本 ([]byte)
 - 真实授权主体与最小权限（任务 3.3/08，2026-10-05 本机 macOS 27.0.1 开发构建；用户操作 Finder 服务与系统提示，终端侧 tccd/进程/端口/HTTP 观察）：普通位置（目录递归、中文+空格 `.MD`、真实空目录）无任何系统授权提示与 FDA/辅助功能/自动化前置，实际 URL 仅 `127.0.0.1` 随机端口。受保护目录（`~/Documents` 专用目标）：提示 `"GoGrip.app" would like to access files in your Documents folder.`，tccd `AUTHREQ_PROMPTING` 主体为 `com.showgp.GoGrip`（`/Applications/GoGrip.app`）；拒绝记为 `TCCDEvent: type=Create … identifier_type=Bundle ID, identifier=com.showgp.GoGrip`；内置工具子进程（`com.showgp.GoGrip.go-grip`）的请求以 responsible=App、subject=`com.showgp.GoGrip` 判定——**授权主体是 App，内置工具由 App 覆盖而非独立身份**。拒绝后无遗留 child/端口/假 running；系统设置打开 GoGrip 的 Documents 项（`type=Modify`）后重开即恢复。外接 USB/APFS 卷（专用目录）与一次性磁盘映像测试卷（detach）：允许时经 native→Go 得到正确内容（`kTCCServiceSystemPolicyRemovableVolumes` 提示同为 App 主体）；专用目标改名/删除与卷 detach 后原路径请求得到真实 `HTTP 500`（`open …: no such file or directory`，非空目录），会话与管理/停止入口保留，无自动迁移/重启/重连；真实空目录仍为可用空状态。单停/Quit 仅释放对应 owned child 与全部 owned PID/端口，独立 CLI（`*:6419`）全程 HTTP 200。
 - 访问失败指导（任务 3.3 用户批准的最小修正）：失败报告新增条件式 `accessCheckGuidance`，仅追加到 `describe(TargetPreparationFailure.unavailable)` 与 `describe(ManagedLaunchFailure.fatal)` 且 `code == "target-unavailable"`；内容为“目标权限、卷挂载/共享状态、以及在 macOS 已请求授权时 System Settings → Privacy & Security → Files and Folders（GoGrip 条目）”，不断言 TCC、不统一导向 FDA，不支持文件等其他失败保持原样（该指导句为用户可见文本，随任务 10 的本地化“错误”范围一并覆盖）。scoped TDD：`testAccessFailuresCarryConditionalGuidanceWithoutCoveringOtherCauses` 先红（81 tests / 2 failures，恰为两类访问失败缺指导）后绿（81/0）；重建后用户在实际拒绝报告中逐字复核该句，恢复复核通过。
 - 身份限制（ad-hoc，实测）：重建改变 CDHash（`02d35053…` → `5db6f61d…`）后 tccd 报 `Failed to match existing code requirement`，Documents 与 RemovableVolumes 均按新构建重新请求授权——开发/候选阶段不承诺跨构建授权稳定。
-- 未验证/限制：候选包（任务 6–7）仍未接通；登录项（任务 5.3）已接通并有本机 native smoke（见上）；首次引导/可再次查看帮助与简中/英文本地化已由任务 5.1/5.2 接通并有本机 native smoke（见上）；最近记录/完整面板已由任务 4.1–4.3 接通并有本机 native smoke（见上）；权限 gate 已由 08 接通并验证（见上）；`NSOpenPanel` 按 `[.folder, markdown]` 过滤，面板无法选入不支持文件——Finder Services 混选与跨入口复用见上面的 07 记录，混合不支持/准备失败输入的批次语义由同一入口的真实 Go smoke 证明；注册时序（协调器/批次依赖先于 provider 注册、注册后第一个请求早于首次面板展示）由实现结构与真实/临时 smoke 覆盖，`make macos-test` 的永久回归只覆盖 provider 输入通道（同步取齐全部 file URL、返回前取齐、空请求即时报错），不构成注册时序证明；根失败提示同样无自动回归（单次呈现/无第二次弹窗由真实 smoke 观察）；两个应用级提示的串行化缺失已由 2026-10-06 的单槽非模态修正解决（见本节“共享提示呈现修正”，旧限制不再适用）；Intel、macOS 13、已挂载网络卷的实际访问、签名公证/候选安装等支持环境未验证；不管理 Chrome 后代。
+- 未验证/限制：候选包（任务 6–7）仍未接通（2026-10-06 更新：候选打包已由任务 12 交付，见第十六节）；登录项（任务 5.3）已接通并有本机 native smoke（见上）；首次引导/可再次查看帮助与简中/英文本地化已由任务 5.1/5.2 接通并有本机 native smoke（见上）；最近记录/完整面板已由任务 4.1–4.3 接通并有本机 native smoke（见上）；权限 gate 已由 08 接通并验证（见上）；`NSOpenPanel` 按 `[.folder, markdown]` 过滤，面板无法选入不支持文件——Finder Services 混选与跨入口复用见上面的 07 记录，混合不支持/准备失败输入的批次语义由同一入口的真实 Go smoke 证明；注册时序（协调器/批次依赖先于 provider 注册、注册后第一个请求早于首次面板展示）由实现结构与真实/临时 smoke 覆盖，`make macos-test` 的永久回归只覆盖 provider 输入通道（同步取齐全部 file URL、返回前取齐、空请求即时报错），不构成注册时序证明；根失败提示同样无自动回归（单次呈现/无第二次弹窗由真实 smoke 观察）；两个应用级提示的串行化缺失已由 2026-10-06 的单槽非模态修正解决（见本节“共享提示呈现修正”，旧限制不再适用）；Intel、macOS 13、已挂载网络卷的实际访问、签名公证/候选安装等支持环境未验证；不管理 Chrome 后代。
 
 ## 八、Markdown 扩展体系
 
@@ -599,10 +599,28 @@ nix build                           # Nix Flakes
 mise run build                      # mise 任务
 ```
 
+### macOS 宿主与候选 App/DMG
+
+```bash
+make macos-candidate        # 候选 App zip + DMG（archive → 签名/架构检查 → 打包）
+make macos-archive          # 显式 archive 到 macos/.build/GoGrip.xcarchive
+make macos-dmg              # 从该 archive 的 App 生成含 /Applications 入口的 DMG
+make macos-candidate-check  # 校验宿主与内置工具的 ad-hoc 签名、identifier、双架构
+make macos-test             # Swift 宿主行为套件（真实 Go）
+make macos                  # 开发用 Release 构建
+```
+
+- 唯一运行路径 `GoGrip.app/Contents/MacOS/go-grip`，运行期没有 Resources/PATH/源码回退。
+- `macos/Scripts/build-go-grip.sh` 以 `CGO_ENABLED=0` 构建 darwin arm64/amd64，lipo 合并后先按独立 identifier `com.showgp.GoGrip.go-grip` ad-hoc 签名，再由 Xcode 以 `com.showgp.GoGrip` 签宿主（不依赖 Developer ID/公证凭据，运行期不 chmod/重签）。
+- 候选 archive 使用 Release 配置，显式 `ARCHS = arm64 x86_64`、`ONLY_ACTIVE_ARCH = NO`、deployment 13.0；宿主与内置 Go 均含两个 slice（实测 `LC_BUILD_VERSION` minos：宿主 13.0，Go 工具 12.0）。
+- 候选产物位于 `macos/.build/candidate/`：`GoGrip.app.zip`（`ditto`，保留包结构、执行权限与签名）与 `GoGrip.dmg`（可拖入 `/Applications` 的安装镜像）。
+- 本阶段止于候选：正式 Developer ID 签名、公证、干净安装验证与公开发布另行处理。
+
 ### 测试
 
 ```bash
 go test ./...                       # 运行所有测试
+make macos-test                     # macOS 宿主行为套件（真实 Go 工具）
 ```
 
 ### CI (`build.yml`)
@@ -614,6 +632,7 @@ go test ./...                       # 运行所有测试
 3. `go test ./...`
 4. `gofmt -d .` 格式检查
 5. `golangci-lint` 静态分析
+6. macOS job（PR）: `make macos-test` + `make macos-candidate`，把 `GoGrip.app.zip`/`GoGrip.dmg` 作为候选 workflow artifact 上传
 
 ### CD (`release.yml`)
 
@@ -623,7 +642,8 @@ go test ./...                       # 运行所有测试
 2. 6 架构交叉编译: darwin/linux/windows × amd64/arm64
 3. `-trimpath -ldflags="-s -w"` 精简二进制
 4. `.tar.gz`/`.zip` + `checksums.txt`
-5. 创建 GitHub Release
+5. 创建 GitHub Release（CLI 资产，流程不变）
+6. macOS App job 仅按同一 `make macos-candidate` 构建候选并上传 workflow artifact；不再向 GitHub Release 上传 App/DMG
 
 ## 十七、扩展指南
 

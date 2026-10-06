@@ -2,6 +2,8 @@
 
 > 状态（2026-10-05）：本文是旧示例 App 的设计记录，其拖拽/历史/Finder Sync/嵌入 Resources 方案已被替换（旧历史存储源与测试已随任务 09 移除，用户旧 50 项数据保留但不被新宿主读取）；当前宿主按 `openspec/changes/rebuild-macos-preview-app` 重建，能力与边界以 `docs/ARCHITECTURE.md` 第七节和 `README.md` 为准。
 
+> 候选打包（2026-10-06，任务 12）：本文末尾的“tag 自动生成正式 DMG”路径已被替换——App/DMG 现为候选产物（`make macos-candidate`，CI 仅作 workflow artifact），正式签名/公证/发布另行审批；当前工程与候选边界见 `README.md` 与 `docs/ARCHITECTURE.md` 第十六节。
+
 > 创建日期: 2026-06-03
 > 最后更新: 2026-06-03（Review 修复后）
 > 状态: 设计完成，待实现

@@ -86,31 +86,23 @@ jobs:
   build-macos-app:
     runs-on: macos-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: "1.26"
 
-      - name: Build GoGrip.app
-        run: |
-          xcodebuild -project macos/GoGrip.xcodeproj \
-            -scheme GoGrip -configuration Release \
-            CODE_SIGN_IDENTITY="" CODE_SIGNING_ALLOWED=NO \
-            archive -archivePath build/GoGrip.xcarchive
+      - name: Run macOS host behavior suite
+        run: make macos-test
 
-      - name: Create DMG
-        run: |
-          mkdir -p dmg-root
-          cp -R build/GoGrip.xcarchive/Products/Applications/GoGrip.app dmg-root/
-          ln -s /Applications dmg-root/Applications
-          hdiutil create -volname "GoGrip" -srcfolder dmg-root \
-            -ov -format UDZO GoGrip.dmg
+      - name: Build candidate App and DMG
+        run: make macos-candidate
 
-      - name: Upload DMG
-        uses: softprops/action-gh-release@v2
+      - name: Upload candidate App and DMG
+        uses: actions/upload-artifact@v4
         with:
-          files: GoGrip.dmg
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: GoGrip-macos-candidate-${{ github.ref_name }}
+          path: |
+            macos/.build/candidate/GoGrip.app.zip
+            macos/.build/candidate/GoGrip.dmg
