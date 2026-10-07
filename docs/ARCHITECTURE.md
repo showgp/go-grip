@@ -606,18 +606,18 @@ mise run build                      # mise 任务
 ### macOS 宿主与候选 App/DMG
 
 ```bash
-make macos-candidate        # 候选 App zip + DMG（archive → 签名/架构检查 → 打包）
-make macos-archive          # 显式 archive 到 macos/.build/GoGrip.xcarchive
-make macos-dmg              # 从该 archive 的 App 生成含 /Applications 入口的 DMG
-make macos-candidate-check  # 校验宿主与内置工具的 ad-hoc 签名、identifier、双架构
+make macos-candidate        # 双架构候选 DMG（per-arch archive → 签名/架构检查 → 打包）
+make macos-archive          # 按 ARCHS=arm64 / ARCHS=x86_64 分别 archive 到 macos/.build/GoGrip-<arch>.xcarchive
+make macos-dmg              # 逐个 archive 生成含 /Applications 入口的 GoGrip-arm64.dmg 与 GoGrip-x86_64.dmg
+make macos-candidate-check  # 逐包校验 ad-hoc 签名、identifier、本架构单切片（另一架构必须失败）
 make macos-test             # Swift 宿主行为套件（真实 Go）
 make macos                  # 开发用 Release 构建
 ```
 
 - 唯一运行路径 `GoGrip.app/Contents/MacOS/go-grip`，运行期没有 Resources/PATH/源码回退。
-- `macos/Scripts/build-go-grip.sh` 以 `CGO_ENABLED=0` 构建 darwin arm64/amd64，lipo 合并后先按独立 identifier `com.showgp.GoGrip.go-grip` ad-hoc 签名，再由 Xcode 以 `com.showgp.GoGrip` 签宿主（不依赖 Developer ID/公证凭据，运行期不 chmod/重签）。
-- 候选 archive 使用 Release 配置，显式 `ARCHS = arm64 x86_64`、`ONLY_ACTIVE_ARCH = NO`、deployment 13.0；宿主与内置 Go 均含两个 slice（实测 `LC_BUILD_VERSION` minos：宿主 13.0，Go 工具 12.0）。
-- 候选产物位于 `macos/.build/candidate/`：`GoGrip.app.zip`（`ditto`，保留包结构、执行权限与签名）与 `GoGrip.dmg`（可拖入 `/Applications` 的安装镜像）。
+- `macos/Scripts/build-go-grip.sh` 按 `$ARCHS` 以 `CGO_ENABLED=0` 构建 darwin arm64 或 amd64 单切片（双架构时保持 lipo 合并路径），先按独立 identifier `com.showgp.GoGrip.go-grip` ad-hoc 签名，再由 Xcode 以 `com.showgp.GoGrip` 签宿主（不依赖 Developer ID/公证凭据，运行期不 chmod/重签）。
+- 候选 archive 使用 Release 配置，按 `ARCHS = arm64` / `ARCHS = x86_64` 各 archive 一次（`ONLY_ACTIVE_ARCH = NO`、deployment 13.0）；每个包内宿主与内置 Go 均为对应单切片，`make macos-candidate-check` 要求本架构 `lipo -verify_arch` 通过且另一架构失败（实测 `LC_BUILD_VERSION` minos：宿主 13.0，Go 工具 12.0）。
+- 候选产物位于 `macos/.build/candidate/`：`GoGrip-arm64.dmg` 与 `GoGrip-x86_64.dmg`（各自含 `/Applications` 入口的安装镜像）；不再产出候选 App zip 与 universal DMG。
 - 本阶段止于候选：正式 Developer ID 签名、公证、干净安装验证与公开发布另行处理。
 
 ### 测试
@@ -636,7 +636,7 @@ make macos-test                     # macOS 宿主行为套件（真实 Go 工�
 3. `go test ./...`
 4. `gofmt -d .` 格式检查
 5. `golangci-lint` 静态分析
-6. macOS job（PR）: `make macos-test` + `make macos-candidate`，把 `GoGrip.app.zip`/`GoGrip.dmg` 作为候选 workflow artifact 上传
+6. macOS job（PR）: `make macos-test` + `make macos-candidate`，把 `GoGrip-arm64.dmg`/`GoGrip-x86_64.dmg` 作为候选 workflow artifact 上传
 
 ### CD (`release.yml`)
 

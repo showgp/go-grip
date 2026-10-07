@@ -104,5 +104,5 @@ jobs:
         with:
           name: GoGrip-macos-candidate-${{ github.ref_name }}
           path: |
-            macos/.build/candidate/GoGrip.app.zip
-            macos/.build/candidate/GoGrip.dmg
+            macos/.build/candidate/GoGrip-arm64.dmg
+            macos/.build/candidate/GoGrip-x86_64.dmg
