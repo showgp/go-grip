@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -43,6 +45,16 @@ func discoverArticlesInDir(rootDir string, relDir string, recursive bool) ([]Art
 			childRelDir := path.Join(relDir, entry.Name())
 			children, err := discoverArticlesInDir(rootDir, childRelDir, recursive)
 			if err != nil {
+				// An unreadable subtree stays out of the tree without failing
+				// the accessible root: keep the readable siblings and let the
+				// watcher report the missing coverage as a degradation. The
+				// selected root itself is not covered here: its own read error
+				// is returned before this loop, so an unreadable root or
+				// selected file still fails. Other error classes keep their
+				// existing propagation.
+				if errors.Is(err, fs.ErrPermission) {
+					continue
+				}
 				return nil, err
 			}
 			if len(children) == 0 {

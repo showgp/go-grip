@@ -130,3 +130,41 @@ Proposal source: ../proposal.md
 - 环境与用户数据：`/Applications/GoGrip.app` 为本次候选（保留）；Services 启用（用户操作）保留并指向该候选；登录项、系统语言、TCC、用户卷未由本票修改；smoke 产生的候选 defaults 键（首次引导、最近目标、面板 UI 状态）已清理以还原会话前状态，旧 `go-grip-history` 未动；smoke 目标目录、临时脚本与截图已清理。
 - tasks.md：本票完整交付并验证 **6.1、6.2、6.3、6.4** 并勾选；08/3.3 与 13/7.1–7.3 未勾，其他票/任务未变。
 - 未覆盖：未提交/推送、未同步主规格、未归档、未发布；未开始 13。
+
+## Redelivery record — 2026-10-06（14 修复后重新交付；票保持 done，账本不变）
+
+**批准与范围**：用户批准沿用本票既有流程重新交付，把 14 的 Go 修复（可读根含不可读子树仍可服务）纳入新候选；本轮只做构建、产物验证、实际运行 smoke 与记录，不新增行为；**不安装/替换 `/Applications`**，不改 Services/TCC/登录项/系统语言，不执行 13 的完整候选验收，不提交/推送/同步/归档，不改 tasks.md 勾选、不重开历史验收。
+
+**源码身份（新候选内含）**：git HEAD `295311a05e558f7712270ce32ba56e5642528764`，工作树含 14 未提交修复（`internal/articles.go`、`cmd/managed_test.go`、`internal/managed_test.go`、`README.md`、`docs/ARCHITECTURE.md` 等）→ 包内工具 `go version -m`：`go1.26.3`、mod `github.com/showgp/go-grip v0.13.3-0.20261006072623-295311a05e55+dirty`，两个 thin slice 均 `build CGO_ENABLED=0`、`GOOS=darwin`、`GOARCH=arm64/amd64`、`vcs.revision=295311a…`、`vcs.time=2026-10-06T07:26:23Z`、`vcs.modified=true`（如实反映 14 修复未提交）。构建环境：Mac14,3（M2）、macOS 27.0.1（26A434）、Xcode 27.0（27A266a）、Go 1.26.3。
+
+**旧候选身份（保留对照，未沿用其证据）**：zip `f5c821df52c75c4bea2a7bc137ef356e973dc2e74530922be59709250deeb5eb`、dmg `91af28d69fcefa18f6de4fbc9d8d854b1c4ac721ab50e3ae9d8663eca07b6a20`、包内工具 `7426a27f54dd281762357469317fd51e1eb83df1e969560d89fd2db9f464bed2`；旧产物备份于 `macos/.build/candidate-12old-backup/`；`/Applications/GoGrip.app` 仍为该旧候选、本轮未改动（工具哈希复核仍 `7426a27f…`）。
+
+**新候选产物与构建**：`make macos-candidate`（2026-10-06 20:46:48–20:47:18，`ARCHIVE SUCCEEDED` + `candidate checks passed`）→ archive `macos/.build/GoGrip.xcarchive`；`macos/.build/candidate/GoGrip.app.zip` sha256 `5062025121c62f0c16fab42135ce7446e0c9bea660645694f8ee79154dd688e2`；`GoGrip.dmg` sha256 `5dd330e802e39829a971c2b008aeb8c98805c95be698d873da21f0d2a0841d81`；archive App 内工具 `61040c8225f996671a6c911e119bbb8c03532e3a9c8f05293f69d6b2db89dca2`（≠ 旧候选，即含 14 修复）、宿主 `09ab6b280ef7aa62e06d6344a19c1d9160fafe8fadfcf09efdb3f681e8a85878`。包版本仍为 `CFBundleShortVersionString 1.0 / CFBundleVersion 1`；候选身份以源码 revision + 上述哈希区分。
+
+**静态/结构检查**：宿主与包内工具均 `lipo` `x86_64 arm64`；`vtool -show-build` 逐 slice minos 13.0（宿主）/12.0（工具）；`codesign -dv` 为工具先签 `com.showgp.GoGrip.go-grip`、宿主 `com.showgp.GoGrip`，均 adhoc、TeamIdentifier not set，`codesign --verify --strict` 两者通过（`macos-candidate-check` 全通过）；包内无 `.appex`/Frameworks，资源仅 `en.lproj`/`zh-Hans.lproj`；`Info.plist` `LSMinimumSystemVersion=13.0`、`LSUIElement=true`。DMG 只读挂载含 `GoGrip.app` 与 `Applications → /Applications`，`diff -r` 与 archive App 一致，卸载干净；zip `ditto -x -k` 解包后 `diff -r` 一致、签名 strict 验证仍通过、可执行位保留（工具/宿主 `-rwxr-xr-x`）。
+
+**实际运行 smoke 1 — 包内 renderer（managed，owner 为脚本，控制 PATH；fixture 为自建可丢弃目录）**：`/tmp/gogrip-redelivery12/zip-x/GoGrip.app/Contents/MacOS/go-grip`（sha256 `61040c82…`，与交付 zip 一致）对含 `README.md`、`子目录/中文 笔记.md` 与 `chmod 000` 的 `denied/`（先验证 `PermissionError`）的根运行 `--managed redelivery12 -r -- <root>`：ready `{"version":1,"event":"ready","url":"http://127.0.0.1:55006/…/中文%20笔记.md","reload":{"state":"pending"}}`，lsof 实测 `127.0.0.1:55006` 监听；两份可读文档 HTTP 200 且 marker 配对；随后 `reload-status` `degraded`，reason 为 `walk error at …/denied: open …: permission denied`；全程 0 个 `target-status unavailable`、0 fatal；改写 README 后同一服务 GET 得到新内容；关闭 owner 写端 exit 0、端口释放。单文件模式 `--managed redelivery12-file -- …/中文 笔记.md` ready（55013）/200/exit 0。→ **证据：14 修复确在新产物的内置 renderer 中，且不是源码树独立二进制。**
+
+**实际运行 smoke 2 — 从交付包取出的 App（源码/构建树之外，本机 `launchctl submit` 直接执行宿主，PATH=`/usr/bin:/bin:/usr/sbin:/sbin`）**：首启引导 alert（“Using GoGrip from Finder”）实际出现并关闭；面板启动显示 “No preview sessions”、登录 `Not set`。原生 Open… → NSOpenPanel 打开 `/tmp/gogrip-redelivery12-fixture/fixture-root` → owned child 为包内 `…/GoGrip.app/Contents/MacOS/go-grip --managed CF6E5F5F-… -r -- <fixture>`（PID 38867，`127.0.0.1:55087`）；curl 与 Chrome 实际页面配对（URL `…/子目录/中文%20笔记.md`，页面 AX 文本 `Candidate12 partial-tree nested marker`）；面板行显示路径、`Running`、实际 URL 与 `Hot reload degraded: walk error at /tmp/gogrip-redelivery12-fixture/fixture-root`。面板 Stop → child/端口释放、行显示 `Stopped`；后续会话（PID 39354 端口 55268、39405 端口 55288、39496 端口 55336）验证自动浏览器打开（55268 标签页实际观察）与多次打开；面板 Quit 后 owned child 与端口全部释放、宿主退出（`launchctl submit` 作业按自身语义重启宿主，`launchctl remove` 后无 GoGrip 进程）。
+- 披露：首个会话（55087）的自动浏览器打开在两次检查中未出现标签页，同候选后续会话与实际 `Open in Browser` 动作均成功打开 Chrome——归 13 新候选复验，不在此下结论；面板单文件选择（CJK 文件名 Go-to/搜索/符号链接行点击）在合成输入下未落选，单文件模式由 smoke 1 在交付产物 renderer 上直接证明；宿主曾自行退出一次（原因未确证），随其 release 两个 owned child/端口，属观察事实。
+
+**行为套件**：`go test ./... -count=1` 全部包 ok（cmd 4.9s、internal 4.2s、hotreload 3.7s、pkg/* 通过）；`make macos-test` **95 tests / 0 failures**（TEST SUCCEEDED）；`gofmt -l .` 干净。本轮未改 Go/Swift 源码，构建对象即含 14 修复的既有工作树。
+
+**变更面**：仅记录文件——`openspec/changes/rebuild-macos-preview-app/tickets/12-universal-candidate.md`（本记录）与 `coverage-plan.md`（状态刷新：12 行、13 行、6.1/6.2/6.4、相关 requirement 行、顶部事实段）；无源代码、工程、Makefile、CI 或 tasks.md 改动；构建产物在 gitignored 的 `macos/.build/`（新 archive/candidate 与旧候选备份）。临时脚本/证据保留于仓库外 `~/GoGrip-redelivery-12/`（tools/evidence：smoke 脚本、宿主日志、截图）；`/tmp` 的候选提取副本、fixture 与挂载点已在验证与独立审阅完成后清理。
+
+**账本**：6.1–6.4 保持已勾（本重新交付不改勾选、不重开）；08/3.3、13/7.1–7.3 未勾；tasks.md 未改；14 保持 done。
+
+**环境与用户数据**：未安装/替换 `/Applications`（旧候选原样，哈希复核）；Services/登录项/TCC/系统语言/用户卷未改；smoke 产生的候选 defaults 键（`go-grip-first-use-guidance-shown`、`go-grip-recent-targets-v1`、`NSNavPanelExpandedSizeForOpenMode`、`NSOSPLastRootDirectory`、`NSWindow Frame GoToSheet`）已删除，域内恢复为仅 `go-grip-history`；剪贴板按会话前内容还原；listener/进程无残留。
+
+**边界与未覆盖**：不执行 13 的完整候选验收（Finder Services 冷启动、批次 5/6、异常退出矩阵、网络/断卷、Intel/macOS 13、候选简中界面）；不安装意味着 Services 条目仍指向旧候选安装，新候选 Finder/Services 复验归 13；未改 CI、未推送、未触发远端；未同步主规格、未归档、未发布。
+
+**独立只读审阅**：本轮由 Standards 与 Spec 两轴独立只读子代理审阅（对象为本重新交付的记录、覆盖地图更新与所供证据；不重跑实现者检查）；结论见下方审阅记录。
+
+## Redelivery review record — 2026-10-06
+
+**方式**：两个独立只读子代理分别执行 Standards 轴与 Spec 轴审阅（各自独立结论，互不代判；未编辑文件、未重跑实现者构建/测试）；对象为本重新交付的记录、覆盖地图更新与所供证据（含可独立抽查的产物哈希/架构/签名/包元数据、账本、defaults/作业残留、外置截图）。**产物身份、构建成功、套件结果与事件/时间线属提供方观察**：证据目录不含构建/套件输出与事件转写，审阅方按只读抽查与记录一致性核对，不作独立复跑。
+
+- **Standards 轴**：初判 **1 阻塞 P2 / 0 advisory / 0 scope**——coverage-plan 的完成票范围（行 5/39/83）含仍 open 的 13，且残留“沿用 12 重新交付仍待批准”的过时表述，与 22/26 账本及本交付边界矛盾。按最小修正（done 范围改为 `01–07、09–12、14`；标注 12 重新交付已于 2026-10-06 完成、仅 13 新候选复验待批准）后定向复核：**0 阻塞 / 0 advisory / 0 scope，worst none**。其独立抽查通过项：新旧 zip/DMG/工具/宿主哈希与备份、`/Applications` 旧候选未动、两二进制双架构与逐 slice minos、adhoc 标识与 TeamIdentifier 缺省、解包后 strict 签名与 archive↔解包一致性、包版本/LSUIElement、fat 内 Go 元数据（revision/dirty/CGO_ENABLED=0）、CLI 22/26（未勾 3.3、7.1–7.3）、defaults 仅 `go-grip-history`、launchctl 作业无残留、外置 Chrome 截图（55087、中文空格嵌套路径与 marker）。
+- **Spec 轴**：初判 **0 阻塞 / 1 P3 advisory / 0 scope**（同一覆盖地图 done 范围问题；另确认交付边界：旧/新候选身份区分、partial-tree 证据归交付产物内置 renderer、未宣称 Finder Services/Intel/macOS 13/13 完整验收；历史 native 单文件/Finder 验收未在新候选复证属本轮批准范围且已披露；首次自动打开未观察与一次宿主退出原因为披露事实，不作缺陷或异常退出验收）。修正后定向复核：**0 阻塞 / 0 advisory / 0 scope，worst none**；并确认无剩余与账本或重新交付边界的矛盾。
+
+**结论**：两轴修复后均无阻塞、无未决 advisory、无 scope decision；本重新交付按批准范围完成并可报告，票保持 `done`、6.1–6.4 勾选不变；13 新候选复验、08/3.3 与主规格同步/归档仍须另行批准。

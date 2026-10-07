@@ -57,3 +57,27 @@
 #### Scenario: Complete this implementation stage
 - **WHEN** 完整功能及候选打包流程达到本阶段验收要求
 - **THEN** 本阶段可以交付功能验收结果，但不因此自动获得公开发布许可，也不把正式签名、公证和安装包验证标为已完成
+
+### Requirement: Explicitly deferred environment-dependent acceptance
+
+本阶段 SHALL 将 Intel 与 macOS 13 实机运行、已挂载网络卷的实际访问与热重载降级、候选级可卸载卷断卷的验收延期至后续 change：上述场景 SHALL NOT 作为本阶段完成条件，也 SHALL NOT 被描述为验证通过；universal 构建、架构/部署静态检查或另一环境的结果 SHALL NOT 替代其实际运行证据。相关行为要求及场景 SHALL 保持有效，由后续 change 承接实际运行验收及所需环境、证据与完成标准；逐项映射见本变更 tasks.md 的延期清单与 coverage-plan.md。
+
+#### Scenario: Close this implementation stage with deferred environments
+- **WHEN** 本阶段按调整后范围完成并汇总候选证据
+- **THEN** 仅将以下延期维度记录为未验证并注明由后续 change 承接：`Universal self-contained application` 的 `Use the same candidate on supported architectures` 与 `Use the application without development tools` 中的 Intel/macOS 13 实机维度；`macos-finder-service` 的 `Supported open targets` / `Receive a directory outside the home folder` 中的网络卷维度；`macos-preview-sessions` 的 `Visible hot-reload degradation` / `Use a network-volume preview` 中的网络卷验收；以及 `Unavailable paths are not empty directories` / `A mounted volume becomes unavailable` 中的候选级可卸载卷断卷验收。这些延期维度不作为本阶段完成条件，不被勾选或宣称已验证；同一场景中已取得证据的其他维度保留其实际结果
+
+#### Scenario: Claim support for a deferred environment
+- **WHEN** 交付说明、验收记录或候选材料提及 Intel、macOS 13、已挂载网络卷或可卸载卷断开支持
+- **THEN** 材料标注尚未取得实际运行证据并由后续 change 承接，不以静态检查、构建或替代/受控结果顶替
+
+### Requirement: Acceptance evidence for the browser-open failure branch
+
+候选级“系统报告浏览器打开失败”分支（`macos-preview-sessions` 的 `Browser opening fails after service startup`、`macos-menu-bar-app` 的 `Recover from browser opening failure`）SHALL 以现有消费者行为回归的确定性结果作为完成证据；受控辅助观察 SHALL NOT 作为该分支的必需证据，仅在既有回归不足以覆盖且另行批准时使用，并 SHALL 标注其控制边界与产物差异、结束后还原并从最终交付候选复核正常路径。验收记录 SHALL 如实区分消费者行为回归结果与候选级真实系统拒绝的实际观察；本轮候选级真实系统拒绝未触发，SHALL NOT 将消费者回归结果表述为已触发系统级拒绝或已通过系统级拒绝验证。本证据标准仅适用于该失败分支，不替代正常浏览器打开路径的实际观察。
+
+#### Scenario: Accept the browser-open failure branch
+- **WHEN** 本阶段判定候选级浏览器打开失败分支的完整证据
+- **THEN** 以现有消费者行为回归的确定性结果验收，并如实记录候选级真实系统拒绝是否触发；本轮未触发，不将消费者回归结果表述为已触发系统级拒绝或已通过系统级拒绝验证
+
+#### Scenario: Use a controlled auxiliary observation
+- **WHEN** 既有回归不足以覆盖该分支且用户另行批准受控辅助
+- **THEN** 受控观察标注所控制边界与产物差异，结束后还原并从最终交付候选复核正常路径，不冒充真实系统拒绝

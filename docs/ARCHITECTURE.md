@@ -225,6 +225,8 @@ Markdown 原始文本 ([]byte)
 | | `Expanded bool` | 目录是否展开（子节点含活跃项） |
 | | `Children []Article` | 子文章/子目录列表 |
 
+目录发现（`discoverArticles` / `discoverArticlesInDir`）递归读取目录：子目录读取失败且属权限类错误（`errors.Is(err, fs.ErrPermission)`，含 EACCES/EPERM）时跳过该子树、保留可读兄弟；不可读子树不进入侧边栏或初始文章，但可访问根仍正常服务可读内容，watcher 的 walk error 按既有覆盖降级机制报告。根目录自身的读取错误在进入递归前返回，因此所选根或所选单文件不可访问仍是 fatal `target-unavailable`（见“服务模式”）；其他错误类别保持原传播，不定义通用扫描容错。
+
 ### 5.5 目标解析 (`internal/target.go`)
 
 | 类型 | 字段 | 说明 |
@@ -324,7 +326,7 @@ Markdown 原始文本 ([]byte)
 
 `internal/managed.go` 为 macOS 宿主提供稳定机器契约；独立 CLI 行为不受影响。managed 模式：
 
-- 在目标解析、卷读取、watcher 与 listener 创建 **之前** 建立 stdin 所有权监视。宿主（或测试中的临时拥有者）仅持有写端：正常停止关闭写端，崩溃/强制终止由内核关闭，两者都表现为 EOF/读错误 → owner loss。单文件目标在 ready 前必须是可读的常规文件（FIFO/设备等非常规目标 fatal），目录访问由解析初始 URL 的文章扫描验证。
+- 在目标解析、卷读取、watcher 与 listener 创建 **之前** 建立 stdin 所有权监视。宿主（或测试中的临时拥有者）仅持有写端：正常停止关闭写端，崩溃/强制终止由内核关闭，两者都表现为 EOF/读错误 → owner loss。单文件目标在 ready 前必须是可读的常规文件（FIFO/设备等非常规目标 fatal），目录访问由解析初始 URL 的文章扫描验证：可读根中的权限拒绝子树按 §5.4 跳过，不使整个会话失败。
 - 使用 `listenOn("127.0.0.1", 0, true)` 真实绑定回环并由 OS 分配端口，URL 取实际端口；不使用默认端口拼接，不接受 `--host`/`--port`/`--export`/`--output`/`--json`（fatal 拒绝，不读取目标），也不由 Go 打开浏览器。
 - stdout 专用于 UTF-8 v1 NDJSON，单序列化 writer（并发事件不拼接帧）；日志/诊断走 stderr。
 - 目标可访问、handler 就绪、listener 绑定后，仅发布一次 `ready`，且它是协议的第一帧：
@@ -337,9 +339,10 @@ Markdown 原始文本 ([]byte)
 | `fatal` | `code`（`target-unavailable` / `listen-failed` / `serve-failed` / `inapplicable-flags` / `invalid-generation`）, `message` |
 
 - 状态出口在 watcher 初始扫描前安装；ready 之前观察到的状态变化折叠进 ready 快照（发布快照与抑制共用同一把锁，不会既丢快照又丢事件），因此 ready 永远是首帧，且不会出现永久 pending 或假 active。`reload.state` 为真实覆盖：`pending`（初始扫描未完成）、`active`（watch 集完整）、`degraded`（watcher 创建失败、walk 错误、预算截断、注册失败或运行期 watcher 错误/新增目录覆盖不足）、`disabled`（`--no-reload`）。运行期错误只写日志与状态出口，不逐条驱动 UI。
-- `target-status` 只来自实际访问：目录目标按根目录级可访问性判定（根读取失败才是 unavailable），单文件目标按所选文件可读常规文件判定；目录内单篇文章或无关资源（图片、不存在子页面）的失败保持原 HTTP 错误，不翻转目标状态，也不显示为空目录。原路径再次访问成功可报告 `available`，但不后台寻找新位置、不轮询、不重连卷、不自动重启或恢复 watcher。
+- `target-status` 只来自实际访问：目录目标按根目录级可访问性判定（根读取失败才是 unavailable），单文件目标按所选文件可读常规文件判定；目录内单篇文章或无关资源（图片、不存在子页面）的失败保持原 HTTP 错误，不翻转目标状态，也不显示为空目录；可访问根中的权限拒绝子树同样不使根 unavailable：发现跳过该子树（§5.4），其缺少覆盖经 `reload-status degraded` 与可获得原因报告，可读内容及手动刷新保持可用。原路径再次访问成功可报告 `available`，但不后台寻找新位置、不轮询、不重连卷、不自动重启或恢复 watcher。
 - managed 专属固定路由 `HEAD/GET /__gogrip/ready` 返回 204 + `X-GoGrip-Generation`，不访问目标、不渲染正文，供宿主启动确认。
 - owner loss 后取消运行，并在独立 watchdog 的 2 秒善后期限后强制退出（绕过 defer），不等阻塞的文件系统操作或启动函数返回；正常取消路径依次执行有界 HTTP 关闭（1s Shutdown 后必要时 Close）、`hotreload.Stop()`（等待 watch 循环结束并关闭 WebSocket 客户端）、仅释放已初始化的 PDF 资源（停止不会创建 headless Chrome）、释放 listener。
+- 已验证（任务 1.1/1.3 补正 14，2026-10-06，真实二进制）：可访问根含 `chmod 000` 子目录时，managed ready 为实际回环 URL（PID 37458，`127.0.0.1:54531`），根与嵌套文档 HTTP 200；ready 快照 `pending` 后经 `reload-status` 报 `degraded` 且 reason 为 walk error（stderr 同步记录），全程无 `target-status unavailable`；改写文档后同一服务手动 GET 得到新内容；关闭 ownership writer 后 exit 0、端口关闭；独立 CLI（PID 37463，`*:54538`，通配监听为既有政策）与另一 managed 会话不受影响。根目录 `chmod 000` 仍 fatal `target-unavailable`、无 ready（`internal/managed_test.go` 回归）。scoped TDD：`cmd` 真实进程回归先红（fatal `resolve initial preview path: … permission denied`）后绿；`go test ./... -count=1`、`go test -race ./internal/... ./cmd/...`（3 轮）、`go vet ./...`、`gofmt -l .` 通过；本机无 `golangci-lint`（已装 staticcheck 二进制因 go1.24 无法加载本模块），既有 `internal/server_test.go:339-340` errcheck 缺口未在本票触碰。临时 fixture 权限还原后删除。
 - 限制：强制退出依赖内核回收 listener/watcher 描述符；不管理 Chrome 等任意后代进程；不对不可中断的内核 I/O 承诺精确硬截止。宿主侧的 descriptor 所有权与停止见下节。
 
 ### Swift 宿主进程适配器（macOS 端）
@@ -401,7 +404,8 @@ Markdown 原始文本 ([]byte)
 - 真实授权主体与最小权限（任务 3.3/08，2026-10-05 本机 macOS 27.0.1 开发构建；用户操作 Finder 服务与系统提示，终端侧 tccd/进程/端口/HTTP 观察）：普通位置（目录递归、中文+空格 `.MD`、真实空目录）无任何系统授权提示与 FDA/辅助功能/自动化前置，实际 URL 仅 `127.0.0.1` 随机端口。受保护目录（`~/Documents` 专用目标）：提示 `"GoGrip.app" would like to access files in your Documents folder.`，tccd `AUTHREQ_PROMPTING` 主体为 `com.showgp.GoGrip`（`/Applications/GoGrip.app`）；拒绝记为 `TCCDEvent: type=Create … identifier_type=Bundle ID, identifier=com.showgp.GoGrip`；内置工具子进程（`com.showgp.GoGrip.go-grip`）的请求以 responsible=App、subject=`com.showgp.GoGrip` 判定——**授权主体是 App，内置工具由 App 覆盖而非独立身份**。拒绝后无遗留 child/端口/假 running；系统设置打开 GoGrip 的 Documents 项（`type=Modify`）后重开即恢复。外接 USB/APFS 卷（专用目录）与一次性磁盘映像测试卷（detach）：允许时经 native→Go 得到正确内容（`kTCCServiceSystemPolicyRemovableVolumes` 提示同为 App 主体）；专用目标改名/删除与卷 detach 后原路径请求得到真实 `HTTP 500`（`open …: no such file or directory`，非空目录），会话与管理/停止入口保留，无自动迁移/重启/重连；真实空目录仍为可用空状态。单停/Quit 仅释放对应 owned child 与全部 owned PID/端口，独立 CLI（`*:6419`）全程 HTTP 200。
 - 访问失败指导（任务 3.3 用户批准的最小修正）：失败报告新增条件式 `accessCheckGuidance`，仅追加到 `describe(TargetPreparationFailure.unavailable)` 与 `describe(ManagedLaunchFailure.fatal)` 且 `code == "target-unavailable"`；内容为“目标权限、卷挂载/共享状态、以及在 macOS 已请求授权时 System Settings → Privacy & Security → Files and Folders（GoGrip 条目）”，不断言 TCC、不统一导向 FDA，不支持文件等其他失败保持原样（该指导句为用户可见文本，随任务 10 的本地化“错误”范围一并覆盖）。scoped TDD：`testAccessFailuresCarryConditionalGuidanceWithoutCoveringOtherCauses` 先红（81 tests / 2 failures，恰为两类访问失败缺指导）后绿（81/0）；重建后用户在实际拒绝报告中逐字复核该句，恢复复核通过。
 - 身份限制（ad-hoc，实测）：重建改变 CDHash（`02d35053…` → `5db6f61d…`）后 tccd 报 `Failed to match existing code requirement`，Documents 与 RemovableVolumes 均按新构建重新请求授权——开发/候选阶段不承诺跨构建授权稳定。
-- 未验证/限制：候选包（任务 6–7）仍未接通（2026-10-06 更新：候选打包已由任务 12 交付，见第十六节）；登录项（任务 5.3）已接通并有本机 native smoke（见上）；首次引导/可再次查看帮助与简中/英文本地化已由任务 5.1/5.2 接通并有本机 native smoke（见上）；最近记录/完整面板已由任务 4.1–4.3 接通并有本机 native smoke（见上）；权限 gate 已由 08 接通并验证（见上）；`NSOpenPanel` 按 `[.folder, markdown]` 过滤，面板无法选入不支持文件——Finder Services 混选与跨入口复用见上面的 07 记录，混合不支持/准备失败输入的批次语义由同一入口的真实 Go smoke 证明；注册时序（协调器/批次依赖先于 provider 注册、注册后第一个请求早于首次面板展示）由实现结构与真实/临时 smoke 覆盖，`make macos-test` 的永久回归只覆盖 provider 输入通道（同步取齐全部 file URL、返回前取齐、空请求即时报错），不构成注册时序证明；根失败提示同样无自动回归（单次呈现/无第二次弹窗由真实 smoke 观察）；两个应用级提示的串行化缺失已由 2026-10-06 的单槽非模态修正解决（见本节“共享提示呈现修正”，旧限制不再适用）；Intel、macOS 13、已挂载网络卷的实际访问、签名公证/候选安装等支持环境未验证；不管理 Chrome 后代。
+- 未验证/限制：候选打包已由任务 12 交付，见第十六节；登录项（任务 5.3）已接通并有本机 native smoke（见上）；首次引导/可再次查看帮助与简中/英文本地化已由任务 5.1/5.2 接通并有本机 native smoke（见上）；最近记录/完整面板已由任务 4.1–4.3 接通并有本机 native smoke（见上）；权限 gate 已由 08 接通并验证（见上）；`NSOpenPanel` 按 `[.folder, markdown]` 过滤，面板无法选入不支持文件——Finder Services 混选与跨入口复用见上面的 07 记录，混合不支持/准备失败输入的批次语义由同一入口的真实 Go smoke 证明；注册时序（协调器/批次依赖先于 provider 注册、注册后第一个请求早于首次面板展示）由实现结构与真实/临时 smoke 覆盖，`make macos-test` 的永久回归只覆盖 provider 输入通道（同步取齐全部 file URL、返回前取齐、空请求即时报错），不构成注册时序证明；根失败提示同样无自动回归（单次呈现/无第二次弹窗由真实 smoke 观察）；两个应用级提示的串行化缺失已由 2026-10-06 的单槽非模态修正解决（见本节“共享提示呈现修正”，旧限制不再适用）；Intel 与 macOS 13 实机运行、已挂载网络卷的实际访问与热重载降级、候选级可卸载卷断卷验收经批准延期至后续 change，保持未验证（2026-10-07 范围对齐）；批准范围内的最终候选验收已完成，08/13 已关闭（见归档变更 `openspec/changes/archive/2026-10-07-rebuild-macos-preview-app/`）；候选已在当前机器安装并实际运行（见票 13 记录），正式干净安装、Developer ID 签名与公证尚未验收；不管理 Chrome 后代。
+- 提交前验证（2026-10-07）：既有 `TestManagedServePublishesReadyAndReleasesPortOnOwnerLoss` 仅读取 ready 后停止消费无缓冲 stdout pipe，后续状态事件可阻塞 watcher 与退出清理；测试现持续消费协议流，与宿主行为一致，不修改生产退出逻辑或放宽断言。修正后该测试连续 20 次通过，`go test ./... -count=1`、`go vet ./...`、变更 Go 文件格式检查及四份主规格严格验证通过。
 
 ## 八、Markdown 扩展体系
 

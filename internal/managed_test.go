@@ -234,7 +234,11 @@ func TestManagedServePublishesReadyAndReleasesPortOnOwnerLoss(t *testing.T) {
 		}
 	})
 
-	line := readManagedLine(t, bufio.NewReader(stdout), 10*time.Second)
+	protocolReader := bufio.NewReader(stdout)
+	line := readManagedLine(t, protocolReader, 10*time.Second)
+	// Keep consuming status events, as the owning app does, so the
+	// unbuffered test pipe cannot block the watcher during shutdown.
+	go func() { _, _ = io.Copy(io.Discard, protocolReader) }()
 	var ready managedEvent
 	if err := json.Unmarshal([]byte(line), &ready); err != nil {
 		t.Fatalf("ready line %q is not JSON: %v", line, err)
@@ -357,6 +361,45 @@ func TestManagedServeRejectsUnreadableSingleFile(t *testing.T) {
 
 	if err := rt.serve(context.Background(), newManagedWriter(&stdout, "gen-secret")); err == nil {
 		t.Fatal("expected unreadable target to fail startup")
+	}
+
+	var event managedEvent
+	if err := json.Unmarshal(bytes.TrimSpace(stdout.Bytes()), &event); err != nil {
+		t.Fatalf("fatal line %q is not JSON: %v", stdout.String(), err)
+	}
+	if event.Event != "fatal" || event.Code != "target-unavailable" {
+		t.Fatalf("event = %+v, want fatal target-unavailable", event)
+	}
+}
+
+// TestManagedServeRejectsUnreadableDirectoryRoot pins the root boundary of the
+// partial-tree degradation: unreadable subtrees are skipped, but a selected
+// directory root that cannot be read still fails startup with a fatal target
+// failure instead of publishing ready or an empty state.
+func TestManagedServeRejectsUnreadableDirectoryRoot(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeManagedDoc(t, filepath.Join(root, "README.md"), "# Marker\n")
+	if err := os.Chmod(root, 0o000); err != nil {
+		t.Fatalf("chmod %s: %v", root, err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(root, 0o755) })
+	if _, err := os.ReadDir(root); err == nil {
+		t.Skip("directory permissions are not enforced for this user")
+	}
+
+	var stdout bytes.Buffer
+	rt := &managedRuntime{
+		opts:          ManagedOptions{Generation: "gen-root-denied", Target: root, Recursive: true},
+		stdin:         strings.NewReader(""),
+		stdout:        &stdout,
+		cleanDeadline: time.Second,
+		forceExit:     func(int) {},
+	}
+
+	if err := rt.serve(context.Background(), newManagedWriter(&stdout, "gen-root-denied")); err == nil {
+		t.Fatal("expected unreadable directory root to fail startup")
 	}
 
 	var event managedEvent

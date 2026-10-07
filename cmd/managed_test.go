@@ -571,6 +571,102 @@ func TestManagedDegradedWatchStillServesAndRefreshes(t *testing.T) {
 	}
 }
 
+// TestManagedAccessibleRootWithUnreadableSubtreeServesReadableContent pins the
+// partial-tree contract: an accessible root that contains a permission-denied
+// subtree still starts a real preview of its readable documents. The subtree
+// must not fail the whole session, must not report the accessible root as
+// unavailable, and must surface as incomplete watch coverage; readable content
+// stays served, including after a manual refresh.
+func TestManagedAccessibleRootWithUnreadableSubtreeServesReadableContent(t *testing.T) {
+	t.Parallel()
+
+	root := t.TempDir()
+	writeProcessDoc(t, filepath.Join(root, "README.md"), "# Partial tree root marker\n")
+	writeProcessDoc(t, filepath.Join(root, "nested", "note.md"), "# Partial tree nested marker\n")
+
+	denied := filepath.Join(root, "denied")
+	if err := os.Mkdir(denied, 0o755); err != nil {
+		t.Fatalf("mkdir %s: %v", denied, err)
+	}
+	if err := os.Chmod(denied, 0o000); err != nil {
+		t.Fatalf("chmod %s: %v", denied, err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(denied, 0o755) })
+	if _, err := os.ReadDir(denied); err == nil {
+		t.Skip("directory permissions are not enforced for this user")
+	}
+
+	child := startGoGrip(t, "--managed", "gen-partial-tree", "-r", "--", root)
+	ready := child.nextEvent(t, 10*time.Second)
+	if ready.Event != "ready" {
+		t.Fatalf("first event = %+v, want ready (stderr: %s)", ready, child.stderr.String())
+	}
+	if ready.Reload == nil {
+		t.Fatalf("ready must carry the reload snapshot: %+v", ready)
+	}
+	origin, err := url.Parse(ready.URL)
+	if err != nil {
+		t.Fatalf("ready URL %q: %v", ready.URL, err)
+	}
+	if origin.Hostname() != "127.0.0.1" || origin.Port() == "" || origin.Port() == "6419" {
+		t.Fatalf("ready URL %q, want the real loopback OS-assigned address", ready.URL)
+	}
+	base := origin.Scheme + "://" + origin.Host
+	assertLoopbackListener(t, child.cmd.Process.Pid, origin.Port())
+
+	if status, body := httpGetBody(t, base+"/README.md"); status != http.StatusOK || !strings.Contains(body, "Partial tree root marker") {
+		t.Fatalf("readable root document = %d %q, want the root document", status, body)
+	}
+	if status, body := httpGetBody(t, base+"/nested/note.md"); status != http.StatusOK || !strings.Contains(body, "Partial tree nested marker") {
+		t.Fatalf("readable nested document = %d %q, want the nested document", status, body)
+	}
+	if status, body := httpGetBody(t, ready.URL); status != http.StatusOK ||
+		(!strings.Contains(body, "Partial tree root marker") && !strings.Contains(body, "Partial tree nested marker")) {
+		t.Fatalf("published URL = %d %q, want one of the readable documents", status, body)
+	}
+
+	// The denied subtree is a real coverage hole: the ready snapshot or a
+	// later reload-status transition reports degraded with a reason, while the
+	// accessible root is never reported unavailable for it.
+	degraded := ready
+	deadline := time.Now().Add(10 * time.Second)
+	for degraded.Reload.State != "degraded" {
+		event := child.nextEvent(t, time.Until(deadline))
+		switch {
+		case event.Event == "ready":
+			t.Fatalf("duplicate ready event: %+v", event)
+		case event.Event == "fatal":
+			t.Fatalf("fatal after ready: %+v", event)
+		case event.Event == "target-status" && event.Target != nil && event.Target.State == "unavailable":
+			t.Fatalf("accessible root reported unavailable: %+v", event)
+		case event.Reload != nil && event.Reload.State == "degraded":
+			degraded = event
+		}
+	}
+	if degraded.Reload.Reason == "" {
+		t.Fatalf("degraded report %+v has no reason", degraded)
+	}
+
+	writeProcessDoc(t, filepath.Join(root, "README.md"), "# Partial tree refreshed marker\n")
+	if status, body := httpGetBody(t, base+"/README.md"); status != http.StatusOK || !strings.Contains(body, "Partial tree refreshed marker") {
+		t.Fatalf("manual refresh = %d %q, want the rewritten content", status, body)
+	}
+
+	child.closeStdin()
+	if code := child.wait(t, 5*time.Second); code != 0 {
+		t.Fatalf("owner loss exit code = %d, want 0 (stderr: %s)", code, child.stderr.String())
+	}
+	for _, event := range child.drainEvents(t) {
+		if event.Event == "target-status" && event.Target != nil && event.Target.State == "unavailable" {
+			t.Fatalf("accessible root reported unavailable: %+v", event)
+		}
+		if event.Event == "fatal" {
+			t.Fatalf("owner loss produced a fatal event: %+v", event)
+		}
+	}
+	assertPortClosed(t, origin.Host)
+}
+
 // TestManagedSingleFileReportsUnavailableAndRecovery pins the single-file
 // target lifecycle: removing the selected file is reported unavailable with a
 // reason while the HTTP error stays its own, and restoring the path reports
