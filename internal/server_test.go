@@ -336,8 +336,8 @@ func TestServeJSONOutput(t *testing.T) {
 	// Close write ends to signal readers after a short delay
 	go func() {
 		time.Sleep(50 * time.Millisecond)
-		outW.Close()
-		errW.Close()
+		_ = outW.Close()
+		_ = errW.Close()
 	}()
 
 	// Wait for stdout with timeout
