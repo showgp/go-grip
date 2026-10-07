@@ -22,7 +22,7 @@ Task source: ../tasks.md
 | Functional acceptance exercises actual user paths | Verify a real Finder-to-browser launch / Verify reuse and explicit stopping / Verify abnormal host termination | 任务 4.2:观察真实浏览器预览、复用、显式停止及异常宿主终止后的服务清理 |
 | Explicitly deferred environment-dependent acceptance | Close this implementation stage with deferred environments / Claim support for a deferred environment | 任务 4.2:候选说明保留 Intel/macOS 13、网络卷及候选级可卸载卷断卷的延期维度,不宣称已验证 |
 
-相关设计决策:1、3、4、5 的最终双包链路复核;沿用 Risks / Trade-offs 的环境限制。保留[主包装规格](../../../specs/macos-app-packaging/spec.md) `Explicitly deferred formal distribution` 的 `Present an unsigned candidate for functional review` / `Complete this implementation stage` 边界:本工单不验收正式签名、公证、干净安装或授予公开发布许可。
+相关设计决策:1、3、4、5 的最终双包链路复核;沿用 Risks / Trade-offs 的环境限制。保留[主包装规格](../../../../specs/macos-app-packaging/spec.md) `Explicitly deferred formal distribution` 的 `Present an unsigned candidate for functional review` / `Complete this implementation stage` 边界:本工单不验收正式签名、公证、干净安装或授予公开发布许可。
 
 ## Acceptance
 

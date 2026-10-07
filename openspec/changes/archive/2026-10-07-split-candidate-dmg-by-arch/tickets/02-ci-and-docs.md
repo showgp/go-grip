@@ -18,7 +18,7 @@ CI 的 release 与 PR macOS 流程均上传两个单架构候选 DMG 作为 work
 | CI uploads split candidate artifacts | Tag build produces candidate artifacts | 任务 3.1:release 与 PR 候选上传均改为工单 01 产出的双 DMG,保持 workflow artifact 定位,不表述为正式发布或已完成公证 |
 | Candidate DMG and Services-only Finder integration | Produce an installable candidate | 任务 3.2、3.3:ADR、README 与 ARCHITECTURE.md 准确描述双包形态及命令;产物构建由工单 01、挂载与实际运行由工单 03 验收 |
 
-相关设计决策:6(单一 artifact 容器与 release/PR 候选上传的双 DMG 路径)、7(ADR-0004 与 ADR-0002 的关系);README 同步决策 3、5 的双包及去 zip 结果。保留[主包装规格](../../../specs/macos-app-packaging/spec.md) `Explicitly deferred formal distribution` 的 `Present an unsigned candidate for functional review` / `Complete this implementation stage` 边界:文档与 CI 候选材料不授予公开发布许可,不宣称正式签名、公证或安装信任流程已验收。
+相关设计决策:6(单一 artifact 容器与 release/PR 候选上传的双 DMG 路径)、7(ADR-0004 与 ADR-0002 的关系);README 同步决策 3、5 的双包及去 zip 结果。保留[主包装规格](../../../../specs/macos-app-packaging/spec.md) `Explicitly deferred formal distribution` 的 `Present an unsigned candidate for functional review` / `Complete this implementation stage` 边界:文档与 CI 候选材料不授予公开发布许可,不宣称正式签名、公证或安装信任流程已验收。
 
 ## Acceptance
 
